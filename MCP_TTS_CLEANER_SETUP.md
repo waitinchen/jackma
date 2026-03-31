@@ -20,7 +20,7 @@
 
 ```bash
 # 在項目根目錄
-cd C:\Users\waiti\jiangbin
+cd C:\Users\waiti\jackma
 
 # 啟動 MCP 服務器（使用端口 8001，避免與主服務器衝突）
 python mcp_server_tts_cleaner.py

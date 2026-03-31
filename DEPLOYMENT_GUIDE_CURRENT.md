@@ -1,4 +1,4 @@
-# 江彬語氣靈 - 當前部署指南
+# 馬雲語氣靈 - 當前部署指南
 
 > 最後更新：2026-02-07
 
@@ -10,7 +10,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │   ┌──────────────────┐       ┌──────────────────┐           │
-│   │ jiangbin-frontend│       │   jiangbin-api   │           │
+│   │ jackma-frontend│       │   jackma-api   │           │
 │   │ (Nginx + React)  │ ────► │ (FastAPI+Python) │           │
 │   │ 靜態檔案服務      │       │ 後端 API 服務    │           │
 │   └──────────────────┘       └──────────────────┘           │
@@ -25,7 +25,7 @@
 │                                      ▼                       │
 │                              ┌──────────────────┐           │
 │                              │  Cloud Storage   │           │
-│                              │ (jiangbin-images)│           │
+│                              │ (jackma-images)│           │
 │                              └──────────────────┘           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -34,8 +34,8 @@
 
 | 服務 | URL |
 |------|-----|
-| 前端 | https://jiangbin-frontend-652703327350.asia-east1.run.app |
-| 後端 API | https://jiangbin-api-652703327350.asia-east1.run.app |
+| 前端 | https://jackma-frontend-652703327350.asia-east1.run.app |
+| 後端 API | https://jackma-api-652703327350.asia-east1.run.app |
 
 ---
 
@@ -58,8 +58,8 @@ $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
 為避免路徑編碼問題，使用獨立的部署資料夾：
 
 ```
-C:\jiangbin-deploy\     # 後端部署用
-C:\jiangbin-frontend\   # 前端部署用
+C:\jackma-deploy\     # 後端部署用
+C:\jackma-frontend\   # 前端部署用
 ```
 
 ---
@@ -72,11 +72,11 @@ C:\jiangbin-frontend\   # 前端部署用
 
 ```powershell
 # 複製後端程式碼
-Copy-Item -Recurse jiangbin-main\app C:\jiangbin-deploy\app
-Copy-Item -Recurse jiangbin-main\static C:\jiangbin-deploy\static
-Copy-Item jiangbin-main\Dockerfile C:\jiangbin-deploy\
-Copy-Item jiangbin-main\requirements.txt C:\jiangbin-deploy\
-Copy-Item jiangbin-main\init_db.py C:\jiangbin-deploy\
+Copy-Item -Recurse jackma-main\app C:\jackma-deploy\app
+Copy-Item -Recurse jackma-main\static C:\jackma-deploy\static
+Copy-Item jackma-main\Dockerfile C:\jackma-deploy\
+Copy-Item jackma-main\requirements.txt C:\jackma-deploy\
+Copy-Item jackma-main\init_db.py C:\jackma-deploy\
 ```
 
 ### 2.2 Dockerfile (後端)
@@ -117,14 +117,14 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
 $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
 
 # 切換到部署目錄
-Set-Location C:\jiangbin-deploy
+Set-Location C:\jackma-deploy
 
 # 建置 Docker 映像並推送到 GCR
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-api --timeout=600
+gcloud builds submit --tag gcr.io/jackma/jackma-api --timeout=600
 
 # 部署到 Cloud Run
-gcloud run deploy jiangbin-api `
-    --image gcr.io/jiangbin/jiangbin-api `
+gcloud run deploy jackma-api `
+    --image gcr.io/jackma/jackma-api `
     --region asia-east1 `
     --platform managed `
     --allow-unauthenticated `
@@ -132,7 +132,7 @@ gcloud run deploy jiangbin-api `
     --cpu 1 `
     --timeout 300 `
     --min-instances 1 `
-    --add-cloudsql-instances jiangbin:asia-east1:jiangbin-db `
+    --add-cloudsql-instances jackma:asia-east1:jackma-db `
     --set-env-vars "GEMINI_API_KEY=你的KEY" `
     --set-env-vars "OPENAI_API_KEY=你的KEY" `
     --set-env-vars "ELEVENLABS_API_KEY=你的KEY" `
@@ -140,7 +140,7 @@ gcloud run deploy jiangbin-api `
     --set-env-vars "ELEVENLABS_MODEL_ID=eleven_flash_v2_5" `
     --set-env-vars "ELEVENLABS_AGENT_ID=agent_0901kernamncf0kr8spv0xw0380t" `
     --set-env-vars "JWT_SECRET_KEY=你的密鑰" `
-    --set-secrets "DATABASE_URL=jiangbin-db-url:latest"
+    --set-secrets "DATABASE_URL=jackma-db-url:latest"
 ```
 
 ---
@@ -151,17 +151,17 @@ gcloud run deploy jiangbin-api `
 
 **重要**: Vite 環境變數是「建置時」嵌入，必須在 build 前設定！
 
-編輯 `jiangbin-main/voice-chat-rwd/.env`：
+編輯 `jackma-main/voice-chat-rwd/.env`：
 
 ```properties
-VITE_API_URL=https://jiangbin-api-652703327350.asia-east1.run.app
+VITE_API_URL=https://jackma-api-652703327350.asia-east1.run.app
 ```
 
 ### 3.2 建置前端
 
 ```powershell
 # 進入前端目錄
-Set-Location jiangbin-main\voice-chat-rwd
+Set-Location jackma-main\voice-chat-rwd
 
 # 安裝依賴
 npm install
@@ -174,15 +174,15 @@ npm run build
 
 ```powershell
 # 清理並複製建置結果
-if (Test-Path "C:\jiangbin-frontend\dist") { 
-    Remove-Item -Recurse -Force "C:\jiangbin-frontend\dist" 
+if (Test-Path "C:\jackma-frontend\dist") { 
+    Remove-Item -Recurse -Force "C:\jackma-frontend\dist" 
 }
-Copy-Item -Recurse jiangbin-main\web_static C:\jiangbin-frontend\dist
+Copy-Item -Recurse jackma-main\web_static C:\jackma-frontend\dist
 ```
 
 ### 3.4 Dockerfile (前端)
 
-在 `C:\jiangbin-frontend\` 建立 Dockerfile：
+在 `C:\jackma-frontend\` 建立 Dockerfile：
 
 ```dockerfile
 FROM nginx:alpine
@@ -200,7 +200,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ### 3.5 nginx.conf
 
-在 `C:\jiangbin-frontend\` 建立 nginx.conf：
+在 `C:\jackma-frontend\` 建立 nginx.conf：
 
 ```nginx
 events {
@@ -243,14 +243,14 @@ http {
 $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
 
 # 切換到部署目錄
-Set-Location C:\jiangbin-frontend
+Set-Location C:\jackma-frontend
 
 # 建置 Docker 映像並推送到 GCR
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-frontend --timeout=600
+gcloud builds submit --tag gcr.io/jackma/jackma-frontend --timeout=600
 
 # 部署到 Cloud Run
-gcloud run deploy jiangbin-frontend `
-    --image gcr.io/jiangbin/jiangbin-frontend `
+gcloud run deploy jackma-frontend `
+    --image gcr.io/jackma/jackma-frontend `
     --region asia-east1 `
     --platform managed `
     --allow-unauthenticated `
@@ -265,7 +265,7 @@ gcloud run deploy jiangbin-frontend `
 
 | 變數名稱 | 儲存方式 | 值 |
 |---------|---------|-----|
-| DATABASE_URL | Secret Manager | `postgresql+psycopg2://postgres:密碼@/jiangbin?host=/cloudsql/jiangbin:asia-east1:jiangbin-db` |
+| DATABASE_URL | Secret Manager | `postgresql+psycopg2://postgres:密碼@/jackma?host=/cloudsql/jackma:asia-east1:jackma-db` |
 | GEMINI_API_KEY | 普通環境變數 | AIzaSy... |
 | OPENAI_API_KEY | 普通環境變數 | sk-proj-... |
 | ELEVENLABS_API_KEY | 普通環境變數 | sk_... |
@@ -278,7 +278,7 @@ gcloud run deploy jiangbin-frontend `
 
 | 變數名稱 | 檔案位置 | 值 |
 |---------|---------|-----|
-| VITE_API_URL | `voice-chat-rwd/.env` | https://jiangbin-api-652703327350.asia-east1.run.app |
+| VITE_API_URL | `voice-chat-rwd/.env` | https://jackma-api-652703327350.asia-east1.run.app |
 
 ---
 
@@ -321,24 +321,24 @@ $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
 
 # === 後端部署 ===
 Write-Host "=== 部署後端 ===" -ForegroundColor Green
-Set-Location C:\jiangbin-deploy
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-api --timeout=600
-gcloud run deploy jiangbin-api --image gcr.io/jiangbin/jiangbin-api --region asia-east1 --platform managed --allow-unauthenticated
+Set-Location C:\jackma-deploy
+gcloud builds submit --tag gcr.io/jackma/jackma-api --timeout=600
+gcloud run deploy jackma-api --image gcr.io/jackma/jackma-api --region asia-east1 --platform managed --allow-unauthenticated
 
 # === 前端建置 ===
 Write-Host "=== 建置前端 ===" -ForegroundColor Green
-Set-Location 你的專案路徑\jiangbin-main\voice-chat-rwd
+Set-Location 你的專案路徑\jackma-main\voice-chat-rwd
 npm run build
 
 # === 複製建置結果 ===
-if (Test-Path "C:\jiangbin-frontend\dist") { Remove-Item -Recurse -Force "C:\jiangbin-frontend\dist" }
-Copy-Item -Recurse ..\web_static C:\jiangbin-frontend\dist
+if (Test-Path "C:\jackma-frontend\dist") { Remove-Item -Recurse -Force "C:\jackma-frontend\dist" }
+Copy-Item -Recurse ..\web_static C:\jackma-frontend\dist
 
 # === 前端部署 ===
 Write-Host "=== 部署前端 ===" -ForegroundColor Green
-Set-Location C:\jiangbin-frontend
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-frontend --timeout=600
-gcloud run deploy jiangbin-frontend --image gcr.io/jiangbin/jiangbin-frontend --region asia-east1 --platform managed --allow-unauthenticated
+Set-Location C:\jackma-frontend
+gcloud builds submit --tag gcr.io/jackma/jackma-frontend --timeout=600
+gcloud run deploy jackma-frontend --image gcr.io/jackma/jackma-frontend --region asia-east1 --platform managed --allow-unauthenticated
 
 Write-Host "=== 部署完成 ===" -ForegroundColor Green
 ```
@@ -350,12 +350,12 @@ Write-Host "=== 部署完成 ===" -ForegroundColor Green
 ### 檢查後端健康狀態
 
 ```bash
-curl https://jiangbin-api-652703327350.asia-east1.run.app/health
+curl https://jackma-api-652703327350.asia-east1.run.app/health
 ```
 
 ### 檢查前端
 
-瀏覽器開啟：https://jiangbin-frontend-652703327350.asia-east1.run.app
+瀏覽器開啟：https://jackma-frontend-652703327350.asia-east1.run.app
 
 ### 檢查 API 連線
 

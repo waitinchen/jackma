@@ -2,7 +2,7 @@
 
 **測試版本**: v1.0  
 **測試日期**: 2026-01-28  
-**測試網址**: https://jiangbin.tonetown.ai/#/call  
+**測試網址**: https://jackma.tonetown.ai/#/call  
 **測試人員**: _______________
 
 ---

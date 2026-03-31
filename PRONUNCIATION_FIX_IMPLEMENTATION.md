@@ -9,7 +9,7 @@
 - 當前規則：`"入行": "踏進這一行"`, `"重來": "再來一次"`
 
 ### ✅ 2. LLM System Prompt (`app/services/llm.py`)
-- 江彬執導電影為《玩命》；若用戶問執導什麼電影，回答「《玩命》」
+- 馬雲執導電影為《玩命》；若用戶問執導什麼電影，回答「《玩命》」
 
 ### ✅ 3. 創建發音修正模組 (`app/services/pronunciation_fix.py`)
 - 實現了完整的發音修正字典 (`PRONUNCIATION_FIX_DICT`)

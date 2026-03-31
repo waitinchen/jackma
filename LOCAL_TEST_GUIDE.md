@@ -10,7 +10,7 @@
 
 ```bash
 # 在項目根目錄
-cd C:\Users\waiti\jiangbin
+cd C:\Users\waiti\jackma
 
 # 啟動 FastAPI 後端（會自動服務前端）
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -42,14 +42,14 @@ http://localhost:8000/?autodial=1#/call
 #### 1. 啟動後端 API（終端 1）
 
 ```bash
-cd C:\Users\waiti\jiangbin
+cd C:\Users\waiti\jackma
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 #### 2. 啟動前端開發服務器（終端 2）
 
 ```bash
-cd C:\Users\waiti\jiangbin\voice-chat-rwd
+cd C:\Users\waiti\jackma\voice-chat-rwd
 npm run dev
 ```
 
@@ -127,7 +127,7 @@ ELEVENLABS_VOICE_ID=your-voice-id
 - [ ] 麥克風權限請求正常
 - [ ] 語音錄製波形顯示正常
 - [ ] 音頻發送無錯誤
-- [ ] 江彬回覆音頻播放正常
+- [ ] 馬雲回覆音頻播放正常
 - [ ] 即時通話雙向音頻正常
 
 ---

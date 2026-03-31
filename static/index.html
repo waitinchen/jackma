@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>江彬 | 語氣靈</title>
+    <title>馬雲 | 語氣靈</title>
     
     <!-- 手機桌面圖示設定 -->
     <link rel="apple-touch-icon" href="/static/icon.png">
     <link rel="icon" type="image/png" href="/static/icon.png">
-    <meta name="apple-mobile-web-app-title" content="江彬語氣靈">
+    <meta name="apple-mobile-web-app-title" content="馬雲語氣靈">
     <meta name="apple-mobile-web-app-capable" content="yes">
     
     <style>
@@ -309,12 +309,12 @@
 
     <div class="container">
         <div class="header">
-            <h1>江彬</h1>
+            <h1>馬雲</h1>
             <div class="subtitle">語氣靈 | 智能體</div>
         </div>
 
         <div class="chat-box" id="chat-box">
-            <div class="msg ai-msg">「我是江彬。」</div>
+            <div class="msg ai-msg">「我是馬雲。」</div>
         </div>
 
         <div class="controls">
@@ -494,7 +494,7 @@
                 mediaRecorder.stream.getTracks().forEach(t => t.stop());
                 btn.classList.remove('recording');
                 document.body.classList.remove('recording-bg');
-                status.innerText = "江哥正在思考...";
+                status.innerText = "馬雲正在思考...";
             }
         }
 
@@ -615,7 +615,7 @@
                 
                 player.src = data.assistant_audio_url;
                 player.play();
-                status.innerText = "江哥說完囉！";
+                status.innerText = "馬雲說完囉！";
             } catch (e) {
                 console.error(e);
                 status.innerText = "失敗: " + e.message;
@@ -659,7 +659,7 @@
                     downloadBtn.onclick = () => {
                         const a = document.createElement('a');
                         a.href = audioUrl;
-                        a.download = 'jiangbin_' + Date.now() + '.mp3';
+                        a.download = 'jackma_' + Date.now() + '.mp3';
                         a.click();
                     };
                     controls.appendChild(downloadBtn);

@@ -19,7 +19,7 @@
 ### 1.1 打開終端，進入項目目錄
 
 ```bash
-cd C:\Users\waiti\jiangbin
+cd C:\Users\waiti\jackma
 ```
 
 ### 1.2 啟動 MCP 服務器

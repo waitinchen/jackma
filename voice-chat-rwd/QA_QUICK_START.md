@@ -4,7 +4,7 @@
 
 ### 1. 開啟測試網址
 ```
-https://jiangbin.tonetown.ai/#/call
+https://jackma.tonetown.ai/#/call
 ```
 
 ### 2. 載入測試輔助腳本

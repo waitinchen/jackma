@@ -52,9 +52,9 @@
 **檢查內容**:
 ```json
 {
-  "name": "江彬 | 語氣靈",
-  "short_name": "江彬",
-  "description": "雙向語音對話系統 - 與江彬進行即時語音對話",
+  "name": "馬雲 | 語氣靈",
+  "short_name": "馬雲",
+  "description": "雙向語音對話系統 - 與馬雲進行即時語音對話",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
@@ -81,7 +81,7 @@
     {
       "name": "開始對話",
       "short_name": "對話",
-      "description": "開始與江彬對話",
+      "description": "開始與馬雲對話",
       "url": "/#/call",
       "icons": [{"src": "pwa-192x192.png", "sizes": "192x192"}]
     }

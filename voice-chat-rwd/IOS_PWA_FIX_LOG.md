@@ -1,7 +1,7 @@
 # iOS PWA 跑版修復紀錄
 
 ## 問題描述
-1. 手機加入主畫面後，APP icon 沒有顯示江彬的大頭貼（顯示黑色方塊）
+1. 手機加入主畫面後，APP icon 沒有顯示馬雲的大頭貼（顯示黑色方塊）
 2. 從主畫面打開 PWA 後，Login 頁面會跑版（內容被截斷）
 
 ## 修復日期
@@ -19,7 +19,7 @@ iOS PWA 在計算 `dvh` 時會因為狀態列、鍵盤等因素跳動，用 fixe
 
 ### 1. index.html
 - 確認 viewport 有 `viewport-fit=cover`（這是 safe-area 生效的前提）
-- 新增多個尺寸的 apple-touch-icon，使用江彬大頭貼 (icon.png)
+- 新增多個尺寸的 apple-touch-icon，使用馬雲大頭貼 (icon.png)
 
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -118,7 +118,7 @@ html, body {
 ```
 
 ### 6. vite.config.ts - PWA manifest
-- 將 icon.png（江彬大頭貼）設為主要 icon
+- 將 icon.png（馬雲大頭貼）設為主要 icon
 - 分離 `any` 和 `maskable` 用途
 
 ```ts
@@ -150,7 +150,7 @@ icons: [
 
 ## 待驗證
 
-- [ ] PWA icon 是否顯示江彬大頭貼
+- [ ] PWA icon 是否顯示馬雲大頭貼
 - [ ] Login 頁面是否正常顯示（不跑版）
 - [ ] Home 頁面對話歷史是否可滾動
 - [ ] Call 頁面是否正常顯示
@@ -300,7 +300,7 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
 ## 2026-02-07 第五次修復（後端）
 
 ### 問題
-江彬的回話過度關心用戶，每句話都反問「你呢？」「你覺得呢？」，像心理諮商師
+馬雲的回話過度關心用戶，每句話都反問「你呢？」「你覺得呢？」，像心理諮商師
 
 ### 修改內容
 
@@ -334,7 +334,7 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
 - **像老朋友聊天，不是像服務人員**
 
 ### 效果
-- 江彬會主動分享自己的經驗和觀點
+- 馬雲會主動分享自己的經驗和觀點
 - 不會每句話都問「你呢？」
 - 對話更自然，像老朋友聊天
 
@@ -345,37 +345,37 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
 ### 前端部署
 ```powershell
 # 1. Build
-Set-Location "jiangbin-main\voice-chat-rwd"
+Set-Location "jackma-main\voice-chat-rwd"
 npm run build
 
 # 2. 複製到部署目錄
-Remove-Item -Recurse -Force "C:\jiangbin-frontend\dist" -ErrorAction SilentlyContinue
-Copy-Item -Recurse "jiangbin-main\web_static" "C:\jiangbin-frontend\dist"
+Remove-Item -Recurse -Force "C:\jackma-frontend\dist" -ErrorAction SilentlyContinue
+Copy-Item -Recurse "jackma-main\web_static" "C:\jackma-frontend\dist"
 
 # 3. 部署到 GCP
 $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
-Set-Location "C:\jiangbin-frontend"
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-frontend --timeout=600
-gcloud run deploy jiangbin-frontend --image gcr.io/jiangbin/jiangbin-frontend --region asia-east1 --platform managed --allow-unauthenticated --min-instances 1
+Set-Location "C:\jackma-frontend"
+gcloud builds submit --tag gcr.io/jackma/jackma-frontend --timeout=600
+gcloud run deploy jackma-frontend --image gcr.io/jackma/jackma-frontend --region asia-east1 --platform managed --allow-unauthenticated --min-instances 1
 ```
 
 ### 後端部署
 ```powershell
 $env:CLOUDSDK_CONFIG = "C:\gcloud_config"
-Set-Location "jiangbin-main"
-gcloud builds submit --tag gcr.io/jiangbin/jiangbin-backend --timeout=600
-gcloud run deploy jiangbin-backend --image gcr.io/jiangbin/jiangbin-backend --region asia-east1 --platform managed --allow-unauthenticated --min-instances 1
+Set-Location "jackma-main"
+gcloud builds submit --tag gcr.io/jackma/jackma-backend --timeout=600
+gcloud run deploy jackma-backend --image gcr.io/jackma/jackma-backend --region asia-east1 --platform managed --allow-unauthenticated --min-instances 1
 ```
 
 ### 服務 URL
-- 前端：https://jiangbin-frontend-652703327350.asia-east1.run.app
-- 後端：https://jiangbin-backend-652703327350.asia-east1.run.app
+- 前端：https://jackma-frontend-652703327350.asia-east1.run.app
+- 後端：https://jackma-backend-652703327350.asia-east1.run.app
 
 ---
 
 ## 待驗證項目（已完成）
 
-- [x] PWA icon 顯示江彬大頭貼
+- [x] PWA icon 顯示馬雲大頭貼
 - [x] Login 頁面正常顯示（不跑版）
 - [x] Home 頁面對話歷史可滾動
 - [x] Call 頁面正常顯示
@@ -385,4 +385,4 @@ gcloud run deploy jiangbin-backend --image gcr.io/jiangbin/jiangbin-backend --re
 - [x] 頁面切換有淡入動畫（無閃黑）
 - [x] 按鈕點擊有縮放效果
 - [x] 對話訊息有滑入動畫
-- [x] 江彬回話不過度反問
+- [x] 馬雲回話不過度反問

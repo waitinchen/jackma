@@ -1,21 +1,21 @@
 # ElevenLabs Agent 通話問題排查
 
-即時通話（`/#/call`）使用 **ElevenLabs Conversational AI**，江彬的人設、開場白、TTS 皆由 **ElevenLabs 後台** 的 Agent 設定決定。本專案只提供連線（signed URL），不控制 Agent 內容。
+即時通話（`/#/call`）使用 **ElevenLabs Conversational AI**，馬雲的人設、開場白、TTS 皆由 **ElevenLabs 後台** 的 Agent 設定決定。本專案只提供連線（signed URL），不控制 Agent 內容。
 
 **MCP 尚未準備好**：請勿將 TTS Cleaner MCP 關聯到 Agent；若已關聯，請先行解除。
 
 ---
 
-## 1. 「一直說 TEST」／開場白不是江彬
+## 1. 「一直說 TEST」／開場白不是馬雲
 
 **原因**：Agent 的 **First Message**（第一句話／開場白）或 **Greeting** 在 ElevenLabs 後台被設成 `TEST` 或測試用文案。
 
 **處理**：
 
-1. 登入 [ElevenLabs](https://elevenlabs.io) → **Conversational AI** → 選擇 **江彬 Agent**。
+1. 登入 [ElevenLabs](https://elevenlabs.io) → **Conversational AI** → 選擇 **馬雲 Agent**。
 2. 在 **Agent** 設定中找 **First Message** / **Greeting** / **Opening**。
 3. 改成正式開場，例如：  
-   `我是江彬。我聽得見，你說吧！`
+   `我是馬雲。我聽得見，你說吧！`
 4. 儲存後重新撥打通話測試。
 
 **本地檢查**：專案內有 `check_agent.py`，可查看目前 Agent 的 `first_message`：
@@ -35,7 +35,7 @@ python check_agent.py
 **處理**：
 
 1. **改 First Message**  
-   ElevenLabs 後台 → Agent → **First Message**：改成正式開場（如 `我是江彬。我聽得見，你說吧！`），**不要**含 `TEST`、`clean`。
+   ElevenLabs 後台 → Agent → **First Message**：改成正式開場（如 `我是馬雲。我聽得見，你說吧！`），**不要**含 `TEST`、`clean`。
 
 2. **改 System Prompt**  
    若有提到「clean」「clean_tts_text」「清洗」等，刪除或改寫；勿讓 Agent 說出這些字。
@@ -50,7 +50,7 @@ python check_agent.py
 
 **罐頭語（每句開頭都說 clean TEST）**：若判斷是**寫死的罐頭語**、與 system prompt 無關，前端已對 **agent_response 文字** 做過濾：依句號／問號／驚嘆號／換行分句，每句開頭若有 `clean TEST`、`clean TEST TEST`… 一律移除後再顯示。**音訊**仍由 ElevenLabs 直出，無法在前端刪除；若需從根本消除，須在 ElevenLabs 後台或 MCP／工具設定找出罐頭語來源並關閉。
 
-**一鍵修復**：專案內 `fix_clean_test.py` 會透過 API 將 **First Message** 改為「我是江彬。我聽得見，你說吧!」，並自 **System Prompt** 移除含 `clean_tts_text`、`清洗文本` 的整行。執行後請重撥測試：
+**一鍵修復**：專案內 `fix_clean_test.py` 會透過 API 將 **First Message** 改為「我是馬雲。我聽得見，你說吧!」，並自 **System Prompt** 移除含 `clean_tts_text`、`清洗文本` 的整行。執行後請重撥測試：
 
 ```bash
 python fix_clean_test.py          # 直接修復
@@ -79,7 +79,7 @@ python fix_clean_test.py --dump     # 傾印含 test/clean 的欄位
 
 ## 4. 解除 MCP 關聯（若曾添加）
 
-1. 登入 [ElevenLabs](https://elevenlabs.io) → **Conversational AI** → 選擇 **江彬 Agent**。
+1. 登入 [ElevenLabs](https://elevenlabs.io) → **Conversational AI** → 選擇 **馬雲 Agent**。
 2. 進入 **Tools** 或 **Integrations**，找到 **TTS Cleaner** / **MCP** 相關項目。
 3. 移除或關閉該 MCP 服務器與 Agent 的關聯。
 4. 檢查 **System Prompt**：刪除任何「調用 clean_tts_text」「清洗文本」等指示。
@@ -91,7 +91,7 @@ python fix_clean_test.py --dump     # 傾印含 test/clean 的欄位
 
 | 項目 | 說明 |
 |------|------|
-| Agent 設定 | ElevenLabs 後台 → Conversational AI → 江彬 Agent |
+| Agent 設定 | ElevenLabs 後台 → Conversational AI → 馬雲 Agent |
 | 連線 API | `GET /api/elevenlabs/signed-url`（依 `ELEVENLABS_AGENT_ID` 取得 signed URL） |
 | 健康檢查 | `python check_agent.py`（讀取 Agent 基本資訊與 `first_message`） |
 | 前端 hook | `voice-chat-rwd/src/hooks/useElevenLabsConvAI.ts`（WebSocket、audio 佇列、event_id 去重） |

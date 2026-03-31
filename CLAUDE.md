@@ -1,16 +1,16 @@
-# CLAUDE.md — JianBin V2 專案指南
+# CLAUDE.md — JackMa V2 專案指南
 
 ## 架構
-- **jiangbin-api**: FastAPI 後端 + 前端靜態檔，Cloud Run，port 8080
-- **jiangbin-agent**: LiveKit Agent（語音通話），Cloud Run，port 8081（Agent 內建 HTTP server）
-- **前端**: React + Vite PWA，build 後由 jiangbin-api 的 `/web_static` 靜態服務
-- **資料庫**: Cloud SQL PostgreSQL（jiangbin-db），pgvector 擴展
+- **jackma-api**: FastAPI 後端 + 前端靜態檔，Cloud Run，port 8080
+- **jackma-agent**: LiveKit Agent（語音通話），Cloud Run，port 8081（Agent 內建 HTTP server）
+- **前端**: React + Vite PWA，build 後由 jackma-api 的 `/web_static` 靜態服務
+- **資料庫**: Cloud SQL PostgreSQL（jackma-db），pgvector 擴展
 - **網域**: https://jianbin3.tonetown.ai（CNAME → ghs.googlehosted.com）
 - **GCP 專案**: jianbinv3（project number: 1058272605064）
 
 ## 部署
 - push to main → GitHub Actions（`.github/workflows/deploy-gcp.yml`）自動部署
-- 同時部署 jiangbin-api + jiangbin-agent 兩個 Cloud Run 服務
+- 同時部署 jackma-api + jackma-agent 兩個 Cloud Run 服務
 - 部署時間約 7 分鐘
 - **不要用 `gcloud run services update --update-env-vars`**，會建立新 revision 但用舊 image
 - Agent **必須** `min-instances=1`（常駐），否則縮到 0 無法接聽通話
@@ -34,20 +34,20 @@
 ## 常用除錯指令（Cloud Shell）
 ```bash
 # 看 API logs
-gcloud run services logs read jiangbin-api --region=asia-east1 --limit=50
+gcloud run services logs read jackma-api --region=asia-east1 --limit=50
 
 # 看 Agent logs
-gcloud run services logs read jiangbin-agent --region=asia-east1 --limit=50
+gcloud run services logs read jackma-agent --region=asia-east1 --limit=50
 
 # 篩選錯誤
-gcloud run services logs read jiangbin-agent --region=asia-east1 --limit=50 2>&1 | grep -iE "error|speech|stt|llm|tts"
+gcloud run services logs read jackma-agent --region=asia-east1 --limit=50 2>&1 | grep -iE "error|speech|stt|llm|tts"
 
 # 強制 Agent 重啟（用 GitHub push 觸發，不要手動 update）
 # 在代碼加一行註解 push 即可
 
 # 連接 Cloud SQL
-gcloud sql connect jiangbin-db --user=postgres --database=jiangbin
-# 密碼: JiangBin2026Secure
+gcloud sql connect jackma-db --user=postgres --database=jackma
+# 密碼: JackMa2026Secure
 ```
 
 ## 檔案結構
@@ -58,7 +58,7 @@ app/                    # FastAPI 後端
   core/                 # 設定、安全、依賴注入
   db/                   # SQLAlchemy models
 agent/                  # LiveKit Agent
-  jiangbin_agent.py     # Agent 主邏輯
+  jackma_agent.py       # Agent 主邏輯
   context_builder.py    # 組裝系統提示
   minimax_tts.py        # MiniMax TTS 自訂 wrapper
   transcript_saver.py   # 通話記錄儲存
@@ -184,9 +184,9 @@ TTS 念錯字：
 - **教訓：前端不能只靠被動事件判斷健康，需要 Agent 主動回報狀態**
 
 ### 11. LiveKit Room Name 必須唯一
-- 固定 room name（`jiangbin-{user_id}`）→ 舊 session 不關閉 → 新撥號連到同一個 room
+- 固定 room name（`jackma-{user_id}`）→ 舊 session 不關閉 → 新撥號連到同一個 room
 - LiveKit 認為已有 Agent → 不 dispatch 新 job → Agent READY 但永遠等不到通話
-- **教訓：room name 必須加 timestamp（`jiangbin-{user_id}-{timestamp}`），每次通話建新 room**
+- **教訓：room name 必須加 timestamp（`jackma-{user_id}-{timestamp}`），每次通話建新 room**
 
 ### 12. ElevenLabs eleven_v3 不支援 WebSocket 串流
 - LiveKit ElevenLabs plugin 預設用 WebSocket（`multi-stream-input` 端點）
@@ -220,7 +220,7 @@ TTS 念錯字：
 - `"老本行"` → `"老本杭"` ✅ flash_v2_5 正確
 - `"影帝"` → 無解，flash_v2_5 系統性念錯「影」這個音
 - **原則：找只有單一讀音的同音字，避免多音字歧義**
-- 替換表在 `agent/jiangbin_agent.py` 的 `PRONUNCIATION_FIXES` dict
+- 替換表在 `agent/jackma_agent.py` 的 `PRONUNCIATION_FIXES` dict
 - 替換發生在 LLM 串流送進 TTS 之前（`pronunciation_transform`），不影響前端顯示文字
 
 ## eleven_v3 現況（2026-03-28）
