@@ -1,4 +1,4 @@
-# Dockerfile for Jiangbin Voice Spirit API (v2.4 - GCP Cloud Run)
+# Dockerfile for JackMa Voice Spirit API (v2.4 - GCP Cloud Run)
 # Multi-stage build: 先構建前端，再構建後端
 FROM node:20-slim AS frontend-builder
 
@@ -44,7 +44,6 @@ COPY --from=frontend-builder /web_static/ ./web_static/
 COPY static/ ./static/
 
 # 複製 Knowledge Base（長期記憶）
-COPY jiangbin.md ./
 COPY Pre-training-memory.md ./
 
 # 創建音頻目錄

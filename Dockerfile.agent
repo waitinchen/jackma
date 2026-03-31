@@ -1,4 +1,4 @@
-# Dockerfile for Jiangbin LiveKit Agent (Cloud Run)
+# Dockerfile for JackMa LiveKit Agent (Cloud Run)
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -18,7 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製 Agent 和相關模組
 COPY agent/ ./agent/
 COPY app/ ./app/
-COPY jiangbin.md ./
 COPY Pre-training-memory.md ./
 
 # LiveKit Agent 啟動
