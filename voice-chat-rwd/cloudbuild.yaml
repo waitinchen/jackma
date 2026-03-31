@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'VITE_API_URL=https://jackma-api-652703327350.asia-east1.run.app'
+      - '-t'
+      - 'gcr.io/jackma/jackma-frontend'
+      - '.'
+
+images:
+  - 'gcr.io/jackma/jackma-frontend'
+
+timeout: '1200s'

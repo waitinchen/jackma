@@ -1,0 +1,1 @@
+print("Absolute path test")

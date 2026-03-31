@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Audio files
+static/audio/*.mp3
+static/audio/*.wav
+
+# Zip files
+*.zip
+
+# Frontend build artifacts (optional - can include if needed)
+voice-chat-rwd/node_modules/
+voice-chat-rwd/dist/
+voice-chat-rwd/android/app/build/
+voice-chat-rwd/android/.gradle/
+voice-chat-rwd/android/build/
+
+# Base locked backup - local protection
+_BASE_LOCKED/
+node_modules/
+frontend/node_modules/
+JianBin_V2.0-master/
+原始檔_補傳/

@@ -1,0 +1,23 @@
+# Render.com 部署配置 (已棄用，改用 GCP Cloud Run)
+# 如需使用 Render，請參考此配置
+# 文檔: https://render.com/docs/blueprint-spec
+
+# 注意：目前專案已遷移至 GCP，請參考 GCP_DEPLOYMENT_GUIDE.md
+
+services:
+  - type: web
+    name: jackma-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+    healthCheckPath: /health

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>江彬 | 語氣靈</title>
+    
+    <!-- 手機桌面圖示設定 -->
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="icon" type="image/png" href="/static/icon.png">
+    <meta name="apple-mobile-web-app-title" content="江彬語氣靈">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            transition: background-color 0.5s;
+        }
+        body.recording-bg {
+            background-color: #1a2a1a; /* 淡淡的深綠色底色 */
+        }
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background-color: #2d2d2d;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+        .header {
+            background-color: #121212;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .header h1 {
+            color: #d4a017;
+            margin: 0;
+            font-size: 1.8rem;
+        }
+        .subtitle {
+            font-size: 1.1rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .chat-box {
+            height: 300px;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .msg {
+            padding: 10px 15px;
+            border-radius: 15px;
+            font-size: 0.95rem;
+            max-width: 85%;
+            line-height: 1.4;
+        }
+        .user-msg {
+            background-color: #d4a017;
+            align-self: flex-end;
+            color: black;
+            border-bottom-right-radius: 2px;
+        }
+        .ai-msg {
+            background-color: #3d3d3d;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        .msg-container {
+            display: flex;
+            flex-direction: column;
+            align-self: flex-start;
+            max-width: 85%;
+        }
+        .msg-container.user {
+            align-self: flex-end;
+        }
+        .audio-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+            opacity: 0.7;
+        }
+        .audio-controls:hover {
+            opacity: 1;
+        }
+        .audio-btn {
+            background: none;
+            border: 1px solid #666;
+            color: #aaa;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            transition: all 0.2s;
+        }
+        .audio-btn:hover {
+            background: #444;
+            color: #fff;
+            border-color: #888;
+        }
+        .audio-btn svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+        }
+        .controls {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #2d2d2d;
+            position: relative;
+        }
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .phone-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #3d3d3d;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, background-color 0.2s;
+            text-decoration: none;
+        }
+        .phone-btn:hover {
+            background-color: #4a4a4a;
+        }
+        .phone-btn:active {
+            transform: scale(0.96);
+        }
+        .phone-icon {
+            fill: #4da3ff;
+            width: 26px;
+            height: 26px;
+        }
+        #record-btn {
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            background-color: #d4a017;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, background-color 0.2s;
+            z-index: 20;
+            /* 針對手機端的關鍵優化 */
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        #record-btn:active {
+            transform: scale(0.95);
+            background-color: #ff4d4d;
+        }
+        .mic-icon {
+            fill: white;
+            width: 45px;
+            height: 45px;
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 1rem;
+            color: #d4a017;
+            font-weight: bold;
+            height: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+        .timer {
+            font-family: 'Consolas', monospace;
+            background: #121212;
+            padding: 2px 10px;
+            border-radius: 5px;
+            margin-left: 10px;
+            color: #ff4d4d;
+            box-shadow: 0 0 5px rgba(255, 77, 77, 0.3);
+        }
+        
+        /* 聲波畫布 */
+        #visualizer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        body.recording-bg #visualizer {
+            opacity: 1;
+        }
+
+        .recording {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+            70% { box-shadow: 0 0 0 25px rgba(255, 77, 77, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+        }
+        
+        .footer-text {
+            font-size: 1rem;
+            color: #666;
+            margin-top: 25px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* 健康指示燈 */
+        .health-bar {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-family: 'Consolas', monospace;
+            z-index: 100;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+        }
+        .health-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #ccc;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        .dot.ok {
+            background-color: #4caf50;
+            box-shadow: 0 0 8px #4caf50;
+        }
+        .dot.error {
+            background-color: #f44336;
+            box-shadow: 0 0 8px #f44336;
+        }
+        .dot.loading {
+            background-color: #ffeb3b;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.3; }
+        }
+        /* Ensure ElevenLabs widget is visible */
+        elevenlabs-convai {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="health-bar">
+        <div class="health-item">
+            <span>LLM:</span>
+            <div id="llm-dot" class="dot loading"></div>
+            <span id="llm-status">---</span>
+        </div>
+        <div class="health-item">
+            <span>TTS:</span>
+            <div id="tts-dot" class="dot loading"></div>
+            <span id="tts-status">---</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>江彬</h1>
+            <div class="subtitle">語氣靈 | 智能體</div>
+        </div>
+
+        <div class="chat-box" id="chat-box">
+            <div class="msg ai-msg">「我是江彬。」</div>
+        </div>
+
+        <div class="controls">
+            <!-- 聲波動畫畫布 -->
+            <canvas id="visualizer"></canvas>
+
+            <div class="action-row">
+                <button id="record-btn">
+                    <svg class="mic-icon" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                </button>
+                <a class="phone-btn" href="/realtime" aria-label="即時對話">
+                    <svg class="phone-icon" viewBox="0 0 24 24"><path d="M6.6 10.8c1.3 2.5 3.1 4.3 5.6 5.6l1.9-1.9c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.4 21 3 13.6 3 4c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-1.9 1.7z"/></svg>
+                </a>
+            </div>
+            <div class="status" id="status">按住說話，放開送出</div>
+        </div>
+    </div>
+
+    <audio id="audio-player" style="display:none"></audio>
+    <div class="footer-text">-超智能科技-</div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let startTime;
+        let timerInterval;
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let animationId;
+        
+        const btn = document.getElementById('record-btn');
+        const status = document.getElementById('status');
+        const chat = document.getElementById('chat-box');
+        const player = document.getElementById('audio-player');
+        const canvas = document.getElementById('visualizer');
+        const canvasCtx = canvas.getContext('2d');
+        
+        const conversationId = "demo_" + Date.now();
+
+        // 檢查健康狀態
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                
+                updateStatus('llm', data.llm);
+                updateStatus('tts', data.tts);
+            } catch (e) {
+                updateStatus('llm', 'Error');
+                updateStatus('tts', 'Error');
+            }
+        }
+
+        function updateStatus(type, status) {
+            const dot = document.getElementById(`${type}-dot`);
+            const text = document.getElementById(`${type}-status`);
+            
+            dot.className = 'dot ' + status.toLowerCase();
+            text.innerText = status;
+            text.style.color = status === 'OK' ? '#4caf50' : '#f44336';
+        }
+
+        // 初始檢查並定期更新
+        checkHealth();
+        setInterval(checkHealth, 30000); // 每 30 秒檢查一次
+
+        // 初始化畫布尺寸
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function updateTimer() {
+            const elapsedMs = Date.now() - startTime;
+            const elapsed = (elapsedMs / 1000).toFixed(1);
+            status.innerHTML = `正在錄音 <span class="timer">${elapsed}s</span>`;
+            
+            // 超過 240 秒自動截斷
+            if (elapsedMs >= 240000) {
+                stopRecording();
+                status.innerText = "已達 240s 上限，自動送出...";
+            }
+        }
+
+        // 繪製聲波動畫
+        function draw() {
+            animationId = requestAnimationFrame(draw);
+            analyser.getByteTimeDomainData(dataArray);
+
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.lineWidth = 3;
+            canvasCtx.strokeStyle = 'rgba(144, 238, 144, 0.6)'; // 淡綠色波浪
+            canvasCtx.beginPath();
+
+            const sliceWidth = canvas.width * 1.0 / dataArray.length;
+            let x = 0;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * canvas.height / 2;
+
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+                x += sliceWidth;
+            }
+
+            canvasCtx.lineTo(canvas.width, canvas.height / 2);
+            canvasCtx.stroke();
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 設定 Web Audio 可視化
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+                mediaRecorder.onstop = sendData;
+                
+                startTime = Date.now();
+                mediaRecorder.start();
+                btn.classList.add('recording');
+                document.body.classList.add('recording-bg');
+                
+                // 啟動計時器與動畫
+                updateTimer();
+                timerInterval = setInterval(updateTimer, 100);
+                draw();
+                
+            } catch (e) {
+                console.error(e);
+                alert("請允許麥克風權限，或檢查設備連線");
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                clearInterval(timerInterval);
+                cancelAnimationFrame(animationId);
+                
+                if (audioContext) audioContext.close();
+                
+                const duration = Date.now() - startTime;
+                if (duration < 1000) {
+                    // 如果按的時間太短 (小於 1.0 秒)，直接重置，不做任何動作
+                    mediaRecorder.onstop = null; 
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+                    btn.classList.remove('recording');
+                    document.body.classList.remove('recording-bg');
+                    status.innerText = "太短了(需1秒)，已忽略";
+                    setTimeout(() => {
+                        if (status.innerText === "太短了(需1秒)，已忽略") {
+                            status.innerText = "按住說話，放開送出";
+                        }
+                    }, 2000);
+                    return;
+                }
+                
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(t => t.stop());
+                btn.classList.remove('recording');
+                document.body.classList.remove('recording-bg');
+                status.innerText = "江哥正在思考...";
+            }
+        }
+
+        // ===== 手機端交互優化 (iOS/iPad 相容) =====
+        // 按住說話，放開送出（不足1秒忽略）
+        
+        let isRecording = false;
+        let pendingStop = false;  // 標記是否需要在錄音啟動後立即停止
+        
+        // 開始錄音的統一入口
+        async function handleStart(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[DEBUG] handleStart fired:', e.type);
+            if (!isRecording) {
+                isRecording = true;
+                pendingStop = false;
+                await startRecording();
+                // 如果在錄音初始化期間已經放開，立即停止
+                if (pendingStop) {
+                    console.log('[DEBUG] pendingStop detected, stopping now');
+                    stopRecording();
+                }
+            }
+        }
+        
+        // 停止錄音的統一入口
+        function handleEnd(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[DEBUG] handleEnd fired:', e.type, 'isRecording:', isRecording);
+            if (isRecording) {
+                isRecording = false;
+                
+                // 立即重置 UI（不等 stopRecording）
+                btn.classList.remove('recording');
+                document.body.classList.remove('recording-bg');
+                clearInterval(timerInterval);
+                cancelAnimationFrame(animationId);
+                
+                // 如果 mediaRecorder 還沒準備好，標記待停止
+                if (!mediaRecorder || mediaRecorder.state !== "recording") {
+                    console.log('[DEBUG] mediaRecorder not ready, setting pendingStop');
+                    pendingStop = true;
+                    status.innerText = "按住說話，放開送出";
+                } else {
+                    stopRecording();
+                }
+            }
+        }
+        
+        // ===== Touch Events (iOS/iPad 優先使用) =====
+        btn.addEventListener('touchstart', handleStart, { passive: false });
+        btn.addEventListener('touchend', handleEnd, { passive: false });
+        btn.addEventListener('touchcancel', handleEnd, { passive: false });
+        
+        // 全域監聽 touchend 作為備用 (iPad Safari 有時不觸發按鈕上的 touchend)
+        document.addEventListener('touchend', (e) => {
+            if (isRecording) {
+                console.log('[DEBUG] Global touchend fallback triggered');
+                handleEnd(e);
+            }
+        }, { passive: false });
+        
+        // ===== Mouse Events (桌面瀏覽器備用) =====
+        btn.addEventListener('mousedown', (e) => {
+            // 避免與 touch 事件重複觸發
+            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+            handleStart(e);
+        });
+        btn.addEventListener('mouseup', (e) => {
+            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+            handleEnd(e);
+        });
+        btn.addEventListener('mouseleave', (e) => {
+            if (isRecording) {
+                isRecording = false;
+                stopRecording();
+            }
+        });
+        
+        // 防止手機長按彈出菜單
+        btn.oncontextmenu = (e) => {
+            e.preventDefault();
+            return false;
+        };
+        
+        // 防止觸控時頁面滾動
+        btn.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+        async function sendData() {
+            if (audioChunks.length === 0) return;
+            
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('audio', blob, 'rec.webm');
+            formData.append('conversation_id', conversationId);
+            formData.append('user_id', 'admin');
+
+            try {
+                const res = await fetch('/api/turn', { method: 'POST', body: formData });
+                
+                // 更強壯的 JSON 解析邏輯
+                let data;
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    data = await res.json();
+                } else {
+                    const text = await res.text();
+                    throw new Error(text || "伺服器回傳未知錯誤");
+                }
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Server Error");
+                }
+                addMsg('user', data.user_text);
+                addMsg('ai', data.assistant_text, data.assistant_audio_url);
+                
+                player.src = data.assistant_audio_url;
+                player.play();
+                status.innerText = "江哥說完囉！";
+            } catch (e) {
+                console.error(e);
+                status.innerText = "失敗: " + e.message;
+            }
+        }
+
+        function addMsg(role, text, audioUrl = null) {
+            if (role === 'user') {
+                const d = document.createElement('div');
+                d.className = 'msg user-msg';
+                d.innerText = text;
+                chat.appendChild(d);
+            } else {
+                // AI 訊息：包含文字 + 音訊控制按鈕
+                const container = document.createElement('div');
+                container.className = 'msg-container';
+                
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg ai-msg';
+                msgDiv.innerText = text;
+                container.appendChild(msgDiv);
+                
+                if (audioUrl) {
+                    const controls = document.createElement('div');
+                    controls.className = 'audio-controls';
+                    
+                    // 重播按鈕
+                    const replayBtn = document.createElement('button');
+                    replayBtn.className = 'audio-btn';
+                    replayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> 重播';
+                    replayBtn.onclick = () => {
+                        player.src = audioUrl;
+                        player.play();
+                    };
+                    controls.appendChild(replayBtn);
+                    
+                    // 下載按鈕
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'audio-btn';
+                    downloadBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> 下載';
+                    downloadBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = audioUrl;
+                        a.download = 'jiangbin_' + Date.now() + '.mp3';
+                        a.click();
+                    };
+                    controls.appendChild(downloadBtn);
+                    
+                    container.appendChild(controls);
+                }
+                
+                chat.appendChild(container);
+            }
+            chat.scrollTop = chat.scrollHeight;
+        }
+    </script>
+  
+</html>

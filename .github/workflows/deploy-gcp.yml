@@ -1,0 +1,90 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: jianbinv3
+  REGION: asia-east1
+  SERVICE_NAME: jackma-api
+  AGENT_SERVICE_NAME: jackma-agent
+  CLOUD_SQL_CONNECTION: jianbinv3:asia-east1:jackma-db
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Create Artifact Registry (if not exists)
+        run: |
+          gcloud artifacts repositories create jackma-repo \
+            --repository-format=docker \
+            --location=${{ env.REGION }} \
+            --quiet 2>/dev/null || true
+
+      # === API + Frontend ===
+      - name: Build and Push API image
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/jackma-repo/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Deploy API to Cloud Run
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/jackma-repo/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=$IMAGE \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --add-cloudsql-instances=${{ env.CLOUD_SQL_CONNECTION }} \
+            --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,ELEVENLABS_VOICE_ID=elevenlabs-voice-id:latest,JWT_SECRET_KEY=jwt-secret-key:latest,LIVEKIT_URL=livekit-url:latest,LIVEKIT_API_KEY=livekit-api-key:latest,LIVEKIT_API_SECRET=livekit-api-secret:latest" \
+            --set-env-vars="DATABASE_URL=postgresql://jiangbin:JiangBin2026DB@/jiangbin?host=/cloudsql/${{ env.CLOUD_SQL_CONNECTION }},ELEVENLABS_MODEL_ID=eleven_multilingual_v2" \
+            --memory=1Gi \
+            --cpu=1 \
+            --timeout=300 \
+            --concurrency=80 \
+            --min-instances=0 \
+            --max-instances=3
+
+      # === LiveKit Agent ===
+      - name: Build and Push Agent image
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/jackma-repo/${{ env.AGENT_SERVICE_NAME }}:${{ github.sha }}
+          docker build -f Dockerfile.agent -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Deploy Agent to Cloud Run
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/jackma-repo/${{ env.AGENT_SERVICE_NAME }}:${{ github.sha }}
+          gcloud run deploy ${{ env.AGENT_SERVICE_NAME }} \
+            --image=$IMAGE \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --add-cloudsql-instances=${{ env.CLOUD_SQL_CONNECTION }} \
+            --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,ELEVENLABS_VOICE_ID=elevenlabs-voice-id:latest,LIVEKIT_URL=livekit-url:latest,LIVEKIT_API_KEY=livekit-api-key:latest,LIVEKIT_API_SECRET=livekit-api-secret:latest,MINIMAX_API_KEY=minimax-api-key:latest,MINIMAX_GROUP_ID=minimax-group-id:latest,MINIMAX_VOICE_ID=minimax-voice-id:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,DEEPGRAM_API_KEY=deepgram-api-key:latest" \
+            --set-env-vars="DATABASE_URL=postgresql://jiangbin:JiangBin2026DB@/jiangbin?host=/cloudsql/${{ env.CLOUD_SQL_CONNECTION }},TTS_PROVIDER=elevenlabs,ELEVENLABS_MODEL_ID=eleven_multilingual_v2" \
+            --port=8080 \
+            --memory=2Gi \
+            --cpu=2 \
+            --timeout=3600 \
+            --concurrency=10 \
+            --min-instances=1 \
+            --max-instances=3 \
+            --no-cpu-throttling \
+            --cpu-boost

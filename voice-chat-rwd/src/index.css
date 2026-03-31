@@ -1,0 +1,497 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.5rem;
+  
+  /* Light Theme (Default - but we will force Dark mostly) */
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Dark Theme - Cinematic Noir */
+  /* Deep Grey Background */
+  --background: oklch(0.18 0.005 260); 
+  /* Soft White Text */
+  --foreground: oklch(0.92 0 0);
+  
+  /* Card Background - Slightly lighter grey */
+  --card: oklch(0.22 0.005 260);
+  --card-foreground: oklch(0.92 0 0);
+  
+  --popover: oklch(0.22 0.005 260);
+  --popover-foreground: oklch(0.92 0 0);
+  
+  /* Primary Action (Yellow/Gold) */
+  --primary: oklch(0.72 0.16 80);
+  --primary-foreground: oklch(0.20 0.05 80);
+  
+  --secondary: oklch(0.30 0.01 260);
+  --secondary-foreground: oklch(0.92 0 0);
+  
+  --muted: oklch(0.25 0.01 260);
+  --muted-foreground: oklch(0.65 0 0);
+  
+  --accent: oklch(0.30 0.01 260);
+  --accent-foreground: oklch(0.92 0 0);
+  
+  --destructive: oklch(0.6 0.15 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  
+  --border: oklch(0.30 0.01 260);
+  --input: oklch(0.30 0.01 260);
+  --ring: oklch(0.72 0.16 80);
+  
+  --sidebar: oklch(0.18 0.005 260);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.72 0.16 80);
+  --sidebar-primary-foreground: oklch(0.20 0.05 80);
+  --sidebar-accent: oklch(0.25 0.01 260);
+  --sidebar-accent-foreground: oklch(0.92 0 0);
+  --sidebar-border: oklch(0.30 0.01 260);
+  --sidebar-ring: oklch(0.72 0.16 80);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground selection:bg-primary/20;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* ===== 第一階段：全域互動增強 ===== */
+  
+  /* 所有按鈕的點擊回饋 - 更明顯的縮放效果 */
+  button, 
+  [role="button"],
+  a[href] {
+    @apply transition-all duration-150 ease-out;
+  }
+  
+  button:active:not(:disabled),
+  [role="button"]:active:not(:disabled),
+  a[href]:active {
+    @apply scale-90;
+    opacity: 0.8;
+  }
+  
+  /* 按鈕 hover 效果 */
+  button:hover:not(:disabled),
+  [role="button"]:hover:not(:disabled) {
+    @apply scale-105;
+  }
+  
+  /* 輸入框 focus 發光效果 */
+  input:focus,
+  textarea:focus {
+    @apply ring-2 ring-primary/40 border-primary/50;
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);
+  }
+}
+
+/* ===== iOS PWA 暴力鎖定方案 ===== */
+/* 1. 強制重置：讓 App 佔滿螢幕，禁止外面滾動 */
+html, body {
+  position: fixed; /* 關鍵：釘死在螢幕上 */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* 禁止彈性滾動 */
+  margin: 0;
+  padding: 0;
+  background-color: black; /* 防止邊緣露出白色 */
+  -webkit-touch-callout: none; /* 禁止長按選單 */
+  overscroll-behavior: none;
+}
+
+/* 2. 讓 React 根節點填滿 */
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 這裡不設 padding，讓 padding 交給個別頁面控制 */
+}
+
+/* 3. 針對 PWA 模式的特別修正 */
+/* 只在 PWA 模式下，讓頁面頂部避開瀏海 */
+@media all and (display-mode: standalone) {
+  #root {
+    /* 只加 padding-top，bottom 由各頁面自己處理 */
+    padding-top: env(safe-area-inset-top);
+    box-sizing: border-box;
+  }
+}
+
+/* 僅對話歷史可捲動（由 Home 的 main 使用） */
+.pwa-scrollable {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Safe area bottom padding */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ===== Splash Screen 動畫 ===== */
+@keyframes splash-glow-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+@keyframes splash-title-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-subtitle-enter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes splash-loader-enter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.splash-glow {
+  animation: splash-glow-pulse 2s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+.splash-title {
+  opacity: 0;
+  animation: splash-title-enter 0.6s ease-out forwards;
+  animation-delay: 0.2s;
+}
+
+.splash-subtitle {
+  opacity: 0;
+  animation: splash-subtitle-enter 0.5s ease-out forwards;
+  animation-delay: 0.6s;
+}
+
+.splash-loader {
+  opacity: 0;
+  animation: splash-loader-enter 0.4s ease-out forwards;
+  animation-delay: 1s;
+}
+
+.splash-footer {
+  opacity: 0;
+  animation: splash-subtitle-enter 0.4s ease-out forwards;
+  animation-delay: 1.2s;
+}
+
+/* 防止 iOS Safari 在 input focus 時自動縮放 */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+/* 4. 解決動畫卡頓：強制開啟硬體加速 */
+.animate-slide-up, .animate-slide-down,
+.animate-scale-in, .animate-scale-out {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* ===== 健康指示燈呼吸效果 ===== */
+@keyframes gentle-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px currentColor;
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 10px currentColor;
+  }
+}
+
+.health-dot-ok {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* ===== 按鈕 hover 微動效果 ===== */
+@keyframes subtle-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+.hover-wiggle:hover {
+  animation: subtle-wiggle 0.3s ease-in-out;
+}
+
+/* ===== 卡片 hover 浮起效果 ===== */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== 第二階段：元件動畫 ===== */
+
+/* 錯誤訊息抖動 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* 滑入展開動畫 */
+@keyframes slide-down-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down-fade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* 圖片預覽彈出 */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* 收回動畫 - 滑上消失 */
+@keyframes slide-up-fade {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up-fade 0.25s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  will-change: transform, opacity;
+}
+
+/* 圖片縮小消失 */
+@keyframes scale-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.animate-scale-out {
+  animation: scale-out 0.2s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  will-change: transform, opacity;
+}
+
+/* 對話載入中的骨架動畫 */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* 登入表單淡入 */
+@keyframes form-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-form-enter {
+  animation: form-enter 0.4s ease-out forwards;
+}
+
+/* 對話訊息滑入動畫 */
+@keyframes message-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-message-in {
+  animation: message-slide-in 0.3s ease-out forwards;
+}
+
+/* 用戶訊息從右邊滑入 */
+@keyframes message-slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-message-in-right {
+  animation: message-slide-in-right 0.3s ease-out forwards;
+}
+
+/* 助手訊息從左邊滑入 */
+@keyframes message-slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-message-in-left {
+  animation: message-slide-in-left 0.3s ease-out forwards;
+}
+
+/* 確保鍵盤彈出時頁面不會縮放或跳動 */
+@supports (-webkit-touch-callout: none) {
+  /* iOS 專用 */
+  body {
+    /* 防止雙擊縮放 */
+    touch-action: manipulation;
+  }
+}

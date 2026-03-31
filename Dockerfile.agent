@@ -1,0 +1,25 @@
+# Dockerfile for Jiangbin LiveKit Agent (Cloud Run)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# 安裝系統依賴
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安裝 Python 依賴
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 複製 Agent 和相關模組
+COPY agent/ ./agent/
+COPY app/ ./app/
+COPY jiangbin.md ./
+COPY Pre-training-memory.md ./
+
+# LiveKit Agent 啟動
+CMD ["python", "-m", "agent.main", "start"]

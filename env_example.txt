@@ -1,0 +1,20 @@
+DATABASE_URL=postgresql://postgres:mysecret@localhost:5435/postgres
+GEMINI_API_KEY=your_gemini_key
+OPENAI_API_KEY=your_openai_key
+ELEVENLABS_API_KEY=your_elevenlabs_key
+ELEVENLABS_VOICE_ID=your_voice_id
+ELEVENLABS_MODEL_ID=eleven_flash_v2_5
+ELEVENLABS_AGENT_ID=your_agent_id
+ELEVENLABS_KB_FOLDER_ID=your_kb_folder_id
+# LiveKit (Phase 0: 即時語音通話)
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+
+SYNC_KB_ENABLED=false
+SYNC_KB_MIN_NEW_ITEMS=5
+SYNC_KB_MAX_ITEMS=20
+SYNC_KB_CANDIDATE_LIMIT=200
+SYNC_KB_MIN_INTERVAL_SECONDS=86400
+SYNC_KB_MAX_TEXT_CHARS=180
+SYNC_KB_MAX_DOC_BYTES=20000

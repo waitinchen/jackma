@@ -1,0 +1,66 @@
+# Cloud Build 配置 - 自動部署到 Cloud Run
+# 文檔: https://cloud.google.com/build/docs/configuring-builds/create-basic-configuration
+
+steps:
+  # 1. 建置 Docker 映像
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/jackma-api:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/jackma-api:latest'
+      - '.'
+
+  # 2. 推送映像到 Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/jackma-api:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/jackma-api:latest'
+
+  # 3. 部署到 Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'jackma-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/jackma-api:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances'
+      - '${_CLOUD_SQL_CONNECTION}'
+      - '--set-env-vars'
+      - 'DATABASE_URL=${_DATABASE_URL}'
+      - '--set-secrets'
+      - 'GEMINI_API_KEY=gemini-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,ELEVENLABS_VOICE_ID=elevenlabs-voice-id:latest,JWT_SECRET_KEY=jwt-secret-key:latest'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300'
+      - '--concurrency'
+      - '80'
+
+# 替換變數 (在 Cloud Build 觸發器中設定)
+substitutions:
+  _REGION: asia-east1
+  _CLOUD_SQL_CONNECTION: ''  # 格式: PROJECT_ID:REGION:INSTANCE_NAME
+  _DATABASE_URL: ''          # 格式: postgresql://user:pass@/dbname?host=/cloudsql/CONNECTION_NAME
+
+images:
+  - 'gcr.io/$PROJECT_ID/jackma-api:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/jackma-api:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>江彬 | 即時對話</title>
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="icon" type="image/png" href="/static/icon.png">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page {
+            width: min(920px, 92vw);
+            padding: 24px;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .title {
+            font-size: 1.2rem;
+            color: #d4a017;
+        }
+        .back {
+            color: #aaa;
+            text-decoration: none;
+            border: 1px solid #444;
+            padding: 6px 12px;
+            border-radius: 999px;
+        }
+        .back:hover {
+            color: #fff;
+            border-color: #666;
+        }
+        .hint {
+            color: #777;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="topbar">
+            <div class="title">江彬 | 即時對話</div>
+            <a class="back" href="/">返回主畫面</a>
+        </div>
+        <div class="hint">點右下角電話圖示開始即時對話。</div>
+        <elevenlabs-convai agent-id="agent_0901kernamncf0kr8spv0xw0380t"></elevenlabs-convai>
+        <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+    </div>
+</body>
+</html>

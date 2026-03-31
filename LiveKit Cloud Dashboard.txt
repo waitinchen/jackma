@@ -1,0 +1,9 @@
+wss://jianbinv2-7kf4dqz2.livekit.cloud
+
+APIviJFP5WTZuRD
+
+xVqLj2NUzDkquQ8naeYqIK2GJdAqaC5eM7plfz0vVOfB
+
+LIVEKIT_URL=wss://jianbinv2-7kf4dqz2.livekit.cloud
+LIVEKIT_API_KEY=APIviJFP5WTZuRD
+LIVEKIT_API_SECRET=xVqLj2NUzDkquQ8naeYqIK2GJdAqaC5eM7plfz0vVOfB
