@@ -425,3 +425,4 @@ async def entrypoint(ctx: JobContext):
 # deepgram key fix 1774703400
 # trigger deploy 1774947183
 # livekit secrets updated 1775004458
+# force livekit secrets reload 1775062196
