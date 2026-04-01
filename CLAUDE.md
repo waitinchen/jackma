@@ -5,7 +5,8 @@
 - **jackma-agent**: LiveKit Agent（語音通話），Cloud Run，port 8081（Agent 內建 HTTP server）
 - **前端**: React + Vite PWA，build 後由 jackma-api 的 `/web_static` 靜態服務
 - **資料庫**: Cloud SQL PostgreSQL（jackma-db），pgvector 擴展
-- **網域**: https://jianbin3.tonetown.ai（CNAME → ghs.googlehosted.com）
+- **網域**: https://jackma.tonetown.ai（CNAME → ghs.googlehosted.com）
+- **LiveKit Cloud**: JackMa_V1 project（wss://jackmav1-r51dx60y.livekit.cloud）
 - **GCP 專案**: jianbinv3（project number: 1058272605064）
 
 ## 部署
@@ -102,6 +103,16 @@ TTS 念錯字：
 - **改完 code 後第一件事：查 CI/CD 是否部署成功**，失敗就代表改動沒上線
 
 ## 開發歷史（最近決策）
+- v3.0.0 (04-01): 馬雲語氣靈 1.0 — 全面改造上線
+  - 人格：江彬→馬雲（靈魂檔 v2，創業心智教練）
+  - 代碼：所有 jiangbin→jackma（class, function, variable, service）
+  - 頭像：馬雲照片替換所有 icon/PWA 圖示
+  - GCP：新建 jackma-db, jackma-repo, jackma-images
+  - LiveKit：新建 JackMa_V1 project（隔離江彬的 jianbinv2）
+  - 網域：jackma.tonetown.ai（CNAME + Cloud Run domain mapping）
+  - TTS：MiniMax 馬雲克隆聲紋（voice_id: moss_audio_062371e7）
+  - LLM：Claude Haiku 4.5（Agent）/ Gemini 2.5 Flash（文字）
+  - STT：Deepgram Nova-2（中文）
 - v2.6.1 (03-28): 加入自然短句確認詞（嗯對、懂了、這樣啊）
 - v2.6.0 (03-28): STT 換 Deepgram Nova-2（中文 Tier1、無串流限制、成本降 68%）
 - v2.5.4 (03-28): 撥號前健康面板顯示提示文字
