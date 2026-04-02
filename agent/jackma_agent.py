@@ -159,32 +159,20 @@ async def entrypoint(ctx: JobContext):
     logger.info(f"TTS 選擇條件: provider={tts_provider}, HAS_MINIMAX={HAS_MINIMAX}, "
                 f"MINIMAX_KEY={'set' if settings.MINIMAX_API_KEY else 'EMPTY'}")
 
-    # TTS 選擇：MiniMax（自訂 wrapper，支援克隆聲紋）或 ElevenLabs
-    if tts_provider == "minimax" and HAS_MINIMAX and settings.MINIMAX_API_KEY:
-        logger.info("TTS: MiniMax Custom (supports cloned voice)")
-        tts = MiniMaxCustomTTS(
-            api_key=settings.MINIMAX_API_KEY,
-            group_id=settings.MINIMAX_GROUP_ID,
-            voice_id=settings.MINIMAX_VOICE_ID,
-            model="speech-02-turbo",
-            speed=1.0,
-        )
-        tts_info = {"provider": "MiniMax", "model": "speech-02-turbo"}
-    else:
-        logger.info("TTS: ElevenLabs flash_v2_5 (WebSocket streaming)")
-        tts = elevenlabs.TTS(
-            voice_id=settings.ELEVENLABS_VOICE_ID,
-            model="eleven_flash_v2_5",
-            api_key=settings.ELEVENLABS_API_KEY,
-            voice_settings=VoiceSettings(
-                stability=0.75,
-                similarity_boost=0.60,
-                style=0.20,
-                use_speaker_boost=True,
-                speed=1.05,
-            ),
-        )
-        tts_info = {"provider": "ElevenLabs", "model": "flash_v2_5"}
+    # TTS 選擇：MiniMax 馬雲克隆聲紋（唯一選項，不 fallback 到 ElevenLabs）
+    if not HAS_MINIMAX or not settings.MINIMAX_API_KEY:
+        logger.error("MiniMax TTS 不可用！HAS_MINIMAX=%s, KEY=%s", HAS_MINIMAX, bool(settings.MINIMAX_API_KEY))
+        raise RuntimeError("MiniMax TTS 必須可用，馬雲語氣靈不支援其他 TTS")
+
+    logger.info("TTS: MiniMax Custom (馬雲克隆聲紋)")
+    tts = MiniMaxCustomTTS(
+        api_key=settings.MINIMAX_API_KEY,
+        group_id=settings.MINIMAX_GROUP_ID,
+        voice_id=settings.MINIMAX_VOICE_ID,
+        model="speech-02-turbo",
+        speed=1.0,
+    )
+    tts_info = {"provider": "MiniMax", "model": "speech-02-turbo"}
 
     # 確保 GOOGLE_API_KEY 環境變數存在（LiveKit Google plugin 需要）
     gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
