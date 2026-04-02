@@ -39,12 +39,14 @@ async def _minimax_synthesize(text: str) -> bytes:
         "Authorization": f"Bearer {settings.MINIMAX_API_KEY}",
         "Content-Type": "application/json",
     }
+    # 馬雲克隆聲紋 — 硬編碼，防止被 Secret Manager 污染
+    JACKMA_VOICE_ID = "moss_audio_062371e7-2c0c-11f1-a44a-c658cff0ef65"
     payload = {
         "model": "speech-02-turbo",
         "text": text,
         "stream": False,
         "voice_setting": {
-            "voice_id": settings.MINIMAX_VOICE_ID,
+            "voice_id": JACKMA_VOICE_ID,
             "speed": 1.0,
             "vol": 1.0,
             "pitch": 0,
@@ -74,56 +76,17 @@ async def _minimax_synthesize(text: str) -> bytes:
     return bytes.fromhex(audio_hex)
 
 
-async def _elevenlabs_synthesize(text: str) -> bytes:
-    """使用 ElevenLabs 合成語音（備用）"""
-    from elevenlabs.client import ElevenLabs
-
-    voice_id = settings.ELEVENLABS_VOICE_ID or "Sq1lHWmu0YA3mqMCyaCk"
-    model_id = settings.ELEVENLABS_MODEL_ID or "eleven_multilingual_v2"
-    client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
-
-    voice_settings = {
-        "stability": 0.70,
-        "similarity_boost": 0.60,
-        "style": 0.30,
-        "use_speaker_boost": True,
-        "speed": 1.10,
-    }
-
-    def _convert() -> bytes:
-        audio = client.text_to_speech.convert(
-            text=text,
-            voice_id=voice_id,
-            model_id=model_id,
-            output_format="mp3_44100_64",
-            voice_settings=voice_settings,
-        )
-        if isinstance(audio, (bytes, bytearray)):
-            return bytes(audio)
-        return b"".join(audio)
-
-    return await asyncio.to_thread(_convert)
-
-
 async def synthesize_speech(text: str) -> str:
-    """合成馬雲的聲音 — MiniMax 優先，ElevenLabs 備用"""
+    """合成馬雲的聲音 — 只用 MiniMax，無 ElevenLabs fallback"""
 
     # 清理舊音檔
     _cleanup_old_audio_files()
 
-    # MiniMax 優先
-    if settings.MINIMAX_API_KEY and settings.MINIMAX_GROUP_ID and settings.MINIMAX_VOICE_ID:
-        try:
-            logger.info(f"TTS: MiniMax speech-02-turbo, text={len(text)} chars")
-            audio_bytes = await _minimax_synthesize(text)
-        except Exception as e:
-            logger.warning(f"MiniMax TTS 失敗，fallback 到 ElevenLabs: {e}")
-            audio_bytes = await _elevenlabs_synthesize(text)
-    elif settings.ELEVENLABS_API_KEY:
-        logger.info(f"TTS: ElevenLabs, text={len(text)} chars")
-        audio_bytes = await _elevenlabs_synthesize(text)
-    else:
-        raise ValueError("沒有可用的 TTS 服務（MiniMax 和 ElevenLabs 都未設定）")
+    if not (settings.MINIMAX_API_KEY and settings.MINIMAX_GROUP_ID and settings.MINIMAX_VOICE_ID):
+        raise ValueError("MiniMax TTS 未設定，馬雲語氣靈不支援其他 TTS")
+
+    logger.info(f"TTS: MiniMax speech-02-turbo, text={len(text)} chars")
+    audio_bytes = await _minimax_synthesize(text)
 
     # 儲存音訊檔案
     audio_dir = BASE_DIR / "static" / "audio"
