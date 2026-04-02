@@ -1,12 +1,7 @@
 """
 馬雲語氣靈 — LiveKit Voice Agent
-核心 Agent：Silero VAD → Google STT → Gemini LLM → ElevenLabs TTS
+核心 Agent：Silero VAD → Deepgram STT → Claude LLM → MiniMax TTS
 透過 LiveKit WebRTC 實現低延遲即時語音通話
-
-P1: Semantic turn detection + interrupt handling
-P2: ElevenLabs streaming TTS 優化
-P3: Google STT streaming 優化
-P4: Metrics 收集（Langfuse-ready）
 """
 import json
 import logging
@@ -25,8 +20,7 @@ load_dotenv(ROOT_DIR / ".env")
 from livekit import agents, rtc
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobContext, WorkerOptions
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import google, elevenlabs, silero, anthropic, deepgram
-from livekit.plugins.elevenlabs import VoiceSettings
+from livekit.plugins import google, silero, anthropic, deepgram
 
 # MiniMax TTS — 自訂 wrapper 支援克隆聲紋
 try:
@@ -39,7 +33,6 @@ except Exception as e:
 
 from app.core.config import settings
 from app.services.llm import clean_reply_text
-from app.services.tts_cleaner import clean_for_tts
 import re
 from agent.context_builder import build_jackma_prompt
 from agent.transcript_saver import save_transcript
@@ -152,39 +145,22 @@ async def entrypoint(ctx: JobContext):
         activation_threshold=0.5,       # 語音偵測門檻
     )
 
-    # P2: TTS — MiniMax 優先（中文原生引擎，根因修復：output_emitter 改用 initialize→push→flush）
-    tts_provider = os.environ.get("TTS_PROVIDER", "minimax").lower()
+    # ===== 馬雲語氣靈 TTS — 只用 MiniMax，無 fallback =====
+    JACKMA_VOICE_ID = "moss_audio_062371e7-2c0c-11f1-a44a-c658cff0ef65"
 
-    # TTS 選擇 debug log
-    logger.info(f"TTS 選擇條件: provider={tts_provider}, HAS_MINIMAX={HAS_MINIMAX}, "
-                f"MINIMAX_KEY={'set' if settings.MINIMAX_API_KEY else 'EMPTY'}")
+    if not HAS_MINIMAX or not settings.MINIMAX_API_KEY:
+        logger.error("MiniMax TTS 不可用！HAS_MINIMAX=%s, KEY=%s", HAS_MINIMAX, bool(settings.MINIMAX_API_KEY))
+        raise RuntimeError("MiniMax TTS unavailable — no fallback for JackMa agent")
 
-    # TTS 選擇：MiniMax（自訂 wrapper，支援克隆聲紋）或 ElevenLabs
-    if tts_provider == "minimax" and HAS_MINIMAX and settings.MINIMAX_API_KEY:
-        logger.info("TTS: MiniMax Custom (supports cloned voice)")
-        tts = MiniMaxCustomTTS(
-            api_key=settings.MINIMAX_API_KEY,
-            group_id=settings.MINIMAX_GROUP_ID,
-            voice_id=settings.MINIMAX_VOICE_ID,
-            model="speech-02-turbo",
-            speed=1.0,
-        )
-        tts_info = {"provider": "MiniMax", "model": "speech-02-turbo"}
-    else:
-        logger.info("TTS: ElevenLabs flash_v2_5 (WebSocket streaming)")
-        tts = elevenlabs.TTS(
-            voice_id=settings.ELEVENLABS_VOICE_ID,
-            model="eleven_flash_v2_5",
-            api_key=settings.ELEVENLABS_API_KEY,
-            voice_settings=VoiceSettings(
-                stability=0.75,
-                similarity_boost=0.60,
-                style=0.20,
-                use_speaker_boost=True,
-                speed=1.05,
-            ),
-        )
-        tts_info = {"provider": "ElevenLabs", "model": "flash_v2_5"}
+    tts = MiniMaxCustomTTS(
+        api_key=settings.MINIMAX_API_KEY,
+        group_id=settings.MINIMAX_GROUP_ID,
+        voice_id=JACKMA_VOICE_ID,
+        model="speech-02-turbo",
+        speed=1.0,
+    )
+    logger.info(f"TTS: MiniMax Custom (voice_id={JACKMA_VOICE_ID})")
+    tts_info = {"provider": "MiniMax", "model": "speech-02-turbo"}
 
     # 確保 GOOGLE_API_KEY 環境變數存在（LiveKit Google plugin 需要）
     gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
