@@ -52,7 +52,7 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --add-cloudsql-instances=${{ env.CLOUD_SQL_CONNECTION }} \
-            --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,ELEVENLABS_VOICE_ID=elevenlabs-voice-id:latest,JWT_SECRET_KEY=jwt-secret-key:latest,LIVEKIT_URL=jackma-livekit-url:latest,LIVEKIT_API_KEY=jackma-livekit-api-key:latest,LIVEKIT_API_SECRET=jackma-livekit-api-secret:latest" \
+            --set-secrets="GEMINI_API_KEY=gemini-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,ELEVENLABS_VOICE_ID=elevenlabs-voice-id:latest,JWT_SECRET_KEY=jwt-secret-key:latest,LIVEKIT_URL=jackma-livekit-url:latest,LIVEKIT_API_KEY=jackma-livekit-api-key:latest,LIVEKIT_API_SECRET=jackma-livekit-api-secret:latest,MINIMAX_API_KEY=minimax-api-key:latest,MINIMAX_GROUP_ID=minimax-group-id:latest,MINIMAX_VOICE_ID=minimax-voice-id:latest" \
             --set-env-vars="DATABASE_URL=postgresql://jackma:JackMa2026DB@/jackma?host=/cloudsql/${{ env.CLOUD_SQL_CONNECTION }},ELEVENLABS_MODEL_ID=eleven_multilingual_v2" \
             --memory=1Gi \
             --cpu=1 \
