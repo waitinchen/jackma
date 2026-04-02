@@ -1,10 +1,12 @@
 """
 馬雲語氣靈 — LiveKit Voice Agent
-核心 Agent：Silero VAD → Deepgram STT → Claude LLM → MiniMax TTS
+核心 Agent：Silero VAD → Google STT → Gemini LLM → ElevenLabs TTS
 透過 LiveKit WebRTC 實現低延遲即時語音通話
 
-架構：所有 heavy 模組（VAD, STT, LLM, TTS）在 Agent 啟動時預載，
-通話連線時只做輕量操作（查 DB 組裝 prompt + 建 session）。
+P1: Semantic turn detection + interrupt handling
+P2: ElevenLabs streaming TTS 優化
+P3: Google STT streaming 優化
+P4: Metrics 收集（Langfuse-ready）
 """
 import json
 import logging
@@ -23,7 +25,8 @@ load_dotenv(ROOT_DIR / ".env")
 from livekit import agents, rtc
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobContext, WorkerOptions
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import google, silero, anthropic, deepgram
+from livekit.plugins import google, elevenlabs, silero, anthropic, deepgram
+from livekit.plugins.elevenlabs import VoiceSettings
 
 # MiniMax TTS — 自訂 wrapper 支援克隆聲紋
 try:
@@ -36,6 +39,7 @@ except Exception as e:
 
 from app.core.config import settings
 from app.services.llm import clean_reply_text
+from app.services.tts_cleaner import clean_for_tts
 import re
 from agent.context_builder import build_jackma_prompt
 from agent.transcript_saver import save_transcript
@@ -43,117 +47,6 @@ from agent.transcript_saver import save_transcript
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("jackma-agent")
 
-
-# ============================================
-# 預載 Heavy 模組（Agent 啟動時執行一次）
-# ============================================
-
-logger.info("🔧 預載 heavy 模組...")
-_preload_start = time.time()
-
-# 1. Silero VAD — ML 模型，載入需 3-5 秒
-_vad = silero.VAD.load(
-    min_silence_duration=0.4,
-    prefix_padding_duration=0.3,
-    min_speech_duration=0.1,
-    activation_threshold=0.5,
-)
-logger.info(f"  VAD 預載完成 ({time.time() - _preload_start:.1f}s)")
-
-# 2. MiniMax TTS — 馬雲克隆聲紋（唯一選項）
-if not HAS_MINIMAX or not settings.MINIMAX_API_KEY:
-    logger.error("MiniMax TTS 不可用！HAS_MINIMAX=%s, KEY=%s", HAS_MINIMAX, bool(settings.MINIMAX_API_KEY))
-    raise RuntimeError("MiniMax TTS 必須可用，馬雲語氣靈不支援其他 TTS")
-
-_tts = MiniMaxCustomTTS(
-    api_key=settings.MINIMAX_API_KEY,
-    group_id=settings.MINIMAX_GROUP_ID,
-    voice_id=settings.MINIMAX_VOICE_ID,
-    model="speech-02-turbo",
-    speed=1.0,
-)
-logger.info(f"  TTS 預載完成: MiniMax Custom (voice={settings.MINIMAX_VOICE_ID[:20]}...)")
-
-# 3. Deepgram STT
-_deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
-_stt_keywords = [("马云", 10.0)]
-if _deepgram_key:
-    _stt = deepgram.STT(
-        model="nova-2",
-        language="zh",
-        interim_results=True,
-        keywords=_stt_keywords,
-        api_key=_deepgram_key,
-    )
-    logger.info(f"  STT 預載完成: Deepgram Nova-2")
-else:
-    _gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
-    if _gemini_key and not os.environ.get("GOOGLE_API_KEY"):
-        os.environ["GOOGLE_API_KEY"] = _gemini_key
-    _stt = google.STT(
-        languages=["cmn-Hans-CN"],
-        interim_results=True,
-        keywords=_stt_keywords,
-    )
-    logger.info(f"  STT 預載完成: Google (fallback)")
-
-# 4. Claude LLM
-_anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-if _anthropic_key:
-    _llm = anthropic.LLM(
-        model="claude-haiku-4-5-20251001",
-        api_key=_anthropic_key,
-        temperature=0.7,
-    )
-    logger.info(f"  LLM 預載完成: Claude Haiku 4.5")
-else:
-    _gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
-    _llm = google.LLM(
-        model="gemini-2.5-flash",
-        temperature=0.7,
-        api_key=_gemini_key,
-    )
-    logger.info(f"  LLM 預載完成: Gemini 2.5 Flash (fallback)")
-
-# 5. 確保 GOOGLE_API_KEY 環境變數存在
-_gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
-if _gemini_key and not os.environ.get("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = _gemini_key
-
-# TTS 發音修正表
-PRONUNCIATION_FIXES = {
-    "老本行": "老本杭",
-}
-
-logger.info(f"🔧 所有 heavy 模組預載完成！總耗時 {time.time() - _preload_start:.1f}s")
-
-
-# ============================================
-# TTS 發音修正 transform
-# ============================================
-
-async def pronunciation_transform(text_stream):
-    """在 LLM 串流送進 TTS 前，替換發音錯誤的詞"""
-    buffer = ""
-    max_key_len = max(len(k) for k in PRONUNCIATION_FIXES) if PRONUNCIATION_FIXES else 0
-    async for chunk in text_stream:
-        buffer += chunk
-        if len(buffer) <= max_key_len:
-            continue
-        for old, new in PRONUNCIATION_FIXES.items():
-            buffer = buffer.replace(old, new)
-        flush_to = len(buffer) - max_key_len
-        yield buffer[:flush_to]
-        buffer = buffer[flush_to:]
-    if buffer:
-        for old, new in PRONUNCIATION_FIXES.items():
-            buffer = buffer.replace(old, new)
-        yield buffer
-
-
-# ============================================
-# Agent 類別
-# ============================================
 
 class JackMaAgent:
     """馬雲語氣靈 Agent — 管理通話生命周期與指標"""
@@ -173,18 +66,22 @@ class JackMaAgent:
 
     @staticmethod
     def clean_stage_directions(text: str) -> str:
-        """移除 LLM 輸出的 stage directions"""
+        """移除 LLM 輸出的 stage directions：（思考）（笑）（停頓）等"""
+        # 移除中文括號內容：（思考）（停頓）（笑）
         text = re.sub(r'[（(][^）)]{1,10}[）)]', '', text)
+        # 移除星號動作：*思考* *笑*
         text = re.sub(r'\*[^*]{1,10}\*', '', text)
         return text.strip()
 
     def on_user_speech(self, text: str):
+        """用戶說話時收集 transcript"""
         if text and text.strip():
             self.transcript.append({"role": "user", "content": text.strip()})
             self.metrics["turns"] += 1
             logger.info(f"[User] {text.strip()[:80]}")
 
     def on_agent_speech(self, text: str):
+        """Agent 回覆時收集 transcript（自動移除 stage directions）"""
         if text and text.strip():
             cleaned = clean_reply_text(text.strip())
             cleaned = self.clean_stage_directions(cleaned)
@@ -193,10 +90,13 @@ class JackMaAgent:
                 logger.info(f"[Agent] {cleaned[:80]}")
 
     def log_metrics_summary(self):
+        """通話結束時輸出延遲指標摘要"""
         m = self.metrics
         duration = time.time() - self.call_start_time if self.call_start_time else 0
+
         def avg(lst):
             return round(sum(lst) / len(lst)) if lst else 0
+
         logger.info(
             f"📊 通話指標摘要:\n"
             f"  通話時長: {duration:.0f}s\n"
@@ -209,39 +109,23 @@ class JackMaAgent:
         )
 
 
-# ============================================
-# TTS 語言指令（固定，不用每次組裝）
-# ============================================
-
-TTS_LANGUAGE_INSTRUCTION = (
-    "\n\n【重要：语音输出规则】\n"
-    "你的回复会被语音合成（TTS）朗读出来。为了让发音自然：\n"
-    "1. 所有回复必须使用**简体中文**（不是繁体）\n"
-    "2. 避免使用书面语，用口语化的表达\n"
-    "3. 绝对不要在回复中包含括号、引号、星号、stage directions\n"
-    "4. 绝对不要写「（思考）」「（停顿）」「（笑）」这类括号内的动作描述\n"
-    "5. 数字用中文念法（例如「三百五」不是「350」）\n"
-    "6. 回复要简短有力，像真人说话，不要长篇大论\n"
-)
-
-
-# ============================================
-# Entrypoint — 通話建立時只做輕量操作
-# ============================================
-
 async def entrypoint(ctx: JobContext):
-    """LiveKit Agent 入口點 — 使用預載的 VAD/STT/LLM/TTS"""
+    """LiveKit Agent 入口點"""
     logger.info(f"🚀 Received job dispatch! room: {ctx.room.name}")
+    logger.info(f"Agent entrypoint called, room: {ctx.room.name}")
 
     jackma = JackMaAgent()
 
+    # 等待用戶加入房間
     await ctx.connect()
     logger.info("Connected to room, waiting for participant...")
 
+    # 等一下讓 participant 加入
     participant = await ctx.wait_for_participant()
     logger.info(f"Participant joined: {participant.identity}")
 
-    user_id = participant.identity
+    # 從 participant metadata 取得 user_id
+    user_id = participant.identity  # identity 就是 user_id
     jackma.user_id = user_id
 
     if participant.metadata:
@@ -253,14 +137,90 @@ async def entrypoint(ctx: JobContext):
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # 組裝馬雲系統提示（唯一需要查 DB 的步驟）
+    # 組裝馬雲系統提示（包含用戶上下文）
     logger.info(f"Building JackMa prompt for user {user_id}...")
     system_prompt = build_jackma_prompt(user_id)
     logger.info(f"System prompt built: {len(system_prompt)} chars")
 
-    full_prompt = system_prompt + TTS_LANGUAGE_INSTRUCTION
+    # P1: 配置 VAD 參數 — 優化 turn detection
+    # min_silence_duration: 停頓多久才判定為「講完」（越長越不容易搶話）
+    # prefix_padding_duration: 保留語音開頭的靜音段（避免截斷開頭字）
+    vad = silero.VAD.load(
+        min_silence_duration=0.4,       # 400ms 靜音才判定講完（降低 200ms 體感延遲）
+        prefix_padding_duration=0.3,    # 保留 300ms 開頭
+        min_speech_duration=0.1,        # 最短語音長度
+        activation_threshold=0.5,       # 語音偵測門檻
+    )
 
-    # 房間斷線時儲存 transcript
+    # P2: TTS — MiniMax 優先（中文原生引擎，根因修復：output_emitter 改用 initialize→push→flush）
+    tts_provider = os.environ.get("TTS_PROVIDER", "minimax").lower()
+
+    # TTS 選擇 debug log
+    logger.info(f"TTS 選擇條件: provider={tts_provider}, HAS_MINIMAX={HAS_MINIMAX}, "
+                f"MINIMAX_KEY={'set' if settings.MINIMAX_API_KEY else 'EMPTY'}")
+
+    # TTS 選擇：MiniMax 馬雲克隆聲紋（唯一選項，不 fallback 到 ElevenLabs）
+    if not HAS_MINIMAX or not settings.MINIMAX_API_KEY:
+        logger.error("MiniMax TTS 不可用！HAS_MINIMAX=%s, KEY=%s", HAS_MINIMAX, bool(settings.MINIMAX_API_KEY))
+        raise RuntimeError("MiniMax TTS 必須可用，馬雲語氣靈不支援其他 TTS")
+
+    logger.info("TTS: MiniMax Custom (馬雲克隆聲紋)")
+    tts = MiniMaxCustomTTS(
+        api_key=settings.MINIMAX_API_KEY,
+        group_id=settings.MINIMAX_GROUP_ID,
+        voice_id=settings.MINIMAX_VOICE_ID,
+        model="speech-02-turbo",
+        speed=1.0,
+    )
+    tts_info = {"provider": "MiniMax", "model": "speech-02-turbo"}
+
+    # 確保 GOOGLE_API_KEY 環境變數存在（LiveKit Google plugin 需要）
+    gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
+    if gemini_key and not os.environ.get("GOOGLE_API_KEY"):
+        os.environ["GOOGLE_API_KEY"] = gemini_key
+        logger.info("Set GOOGLE_API_KEY from GEMINI_API_KEY")
+
+    # P3: Deepgram Nova-2 STT — 中文支援，無串流時間限制
+    # Nova-3 中文尚未支援（400 error），用 Nova-2
+    stt_keywords = [("马云", 10.0)]
+    deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
+    if deepgram_key:
+        logger.info(f"STT: Deepgram Nova-2 (keywords: {stt_keywords})")
+        stt = deepgram.STT(
+            model="nova-2",
+            language="zh",
+            interim_results=True,
+            keywords=stt_keywords,
+            api_key=deepgram_key,
+        )
+    else:
+        # Fallback to Google STT
+        logger.info(f"STT: Google (Deepgram key not set, fallback)")
+        stt = google.STT(
+            languages=["cmn-Hans-CN"],
+            interim_results=True,
+            keywords=stt_keywords,
+        )
+
+    # Claude LLM（Haiku 4.5 — 快速、低延遲）
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if anthropic_key:
+        logger.info("LLM: Claude Haiku 4.5")
+        llm = anthropic.LLM(
+            model="claude-haiku-4-5-20251001",
+            api_key=anthropic_key,
+            temperature=0.7,
+        )
+    else:
+        # Fallback to Gemini
+        logger.info("LLM: Gemini 2.5 Flash (Anthropic key not set)")
+        llm = google.LLM(
+            model="gemini-2.5-flash",
+            temperature=0.7,
+            api_key=gemini_key,
+        )
+
+    # 房間斷線時儲存 transcript 和指標
     @ctx.room.on("disconnected")
     def on_disconnected():
         jackma.log_metrics_summary()
@@ -272,19 +232,59 @@ async def entrypoint(ctx: JobContext):
             except Exception as e:
                 logger.error(f"Failed to save transcript: {e}")
 
+    # 記錄通話開始時間
     jackma.call_start_time = time.time()
 
-    # 建立 session — 使用預載的元件
+    # TTS 語言指令：LLM 用簡體中文回覆（TTS 發音正確），前端做簡→繁顯示
+    tts_language_instruction = (
+        "\n\n【重要：语音输出规则】\n"
+        "你的回复会被语音合成（TTS）朗读出来。为了让发音自然：\n"
+        "1. 所有回复必须使用**简体中文**（不是繁体）\n"
+        "2. 避免使用书面语，用口语化的表达\n"
+        "3. 绝对不要在回复中包含括号、引号、星号、stage directions\n"
+        "4. 绝对不要写「（思考）」「（停顿）」「（笑）」这类括号内的动作描述\n"
+        "5. 数字用中文念法（例如「三百五」不是「350」）\n"
+        "6. 回复要简短有力，像真人说话，不要长篇大论\n"
+    )
+    full_prompt = system_prompt + tts_language_instruction
+
+    # TTS 發音修正：自訂 async generator 替換容易唸錯的詞
+    # 不依賴 livekit.agents.voice.text_transforms（Docker 容器沒有這個模組）
+    PRONUNCIATION_FIXES = {
+        "老本行": "老本杭",  # 多音字消歧：「行」háng 被念成 xíng
+        # "影帝": 無解，flash_v2_5 系統性念錯「影」，等 eleven_v3 支援
+    }
+
+    async def pronunciation_transform(text_stream):
+        """在 LLM 串流送進 TTS 前，替換發音錯誤的詞"""
+        buffer = ""
+        max_key_len = max(len(k) for k in PRONUNCIATION_FIXES) if PRONUNCIATION_FIXES else 0
+        async for chunk in text_stream:
+            buffer += chunk
+            if len(buffer) <= max_key_len:
+                continue
+            for old, new in PRONUNCIATION_FIXES.items():
+                buffer = buffer.replace(old, new)
+            flush_to = len(buffer) - max_key_len
+            yield buffer[:flush_to]
+            buffer = buffer[flush_to:]
+        if buffer:
+            for old, new in PRONUNCIATION_FIXES.items():
+                buffer = buffer.replace(old, new)
+            yield buffer
+
+    logger.info(f"TTS 發音修正表: {len(PRONUNCIATION_FIXES)} 組")
+
     session = AgentSession(
-        stt=_stt,
-        llm=_llm,
-        tts=_tts,
-        vad=_vad,
+        stt=stt,
+        llm=llm,
+        tts=tts,
+        vad=vad,
         tts_text_transforms=[pronunciation_transform],
     )
 
-    # 事件監聽
-    _last_user_speech_time = [0.0]
+    # 事件監聽：收集 transcript + 計時
+    _last_user_speech_time = [0.0]  # 用 list 讓 closure 可修改
 
     @session.on("user_input_transcribed")
     def on_transcribed(event):
@@ -312,11 +312,13 @@ async def entrypoint(ctx: JobContext):
     # 啟動 Agent
     await session.start(
         room=ctx.room,
-        agent=Agent(instructions=full_prompt),
+        agent=Agent(
+            instructions=full_prompt,
+        ),
         room_input_options=RoomInputOptions(close_on_disconnect=False),
     )
 
-    # 生成開場白
+    # 生成開場白（簡體中文）
     await session.generate_reply(
         instructions="用户刚接通电话。用马云的语气自然地打个招呼，像跟一个创业者朋友接电话一样。不要太正式，不要自我介绍。用简体中文回复。"
     )
@@ -324,17 +326,18 @@ async def entrypoint(ctx: JobContext):
     # 通知前端 TTS 資訊
     try:
         await ctx.room.local_participant.publish_data(
-            json.dumps({"type": "tts_info", "provider": "MiniMax", "model": "speech-02-turbo"}).encode(),
+            json.dumps({"type": "tts_info", **tts_info}).encode(),
         )
     except Exception:
         pass
 
     logger.info("Agent started and greeting sent.")
 
-    # 靜默檢測
+    # 靜默檢測：240 秒無新對話 → 詢問 → 再 60 秒無回應 → 掛斷
     import asyncio
-    _last_activity_time = [time.time()]
+    _last_activity_time = [time.time()]  # 追蹤最後一次互動
 
+    # 在 STT 回調中更新最後互動時間
     _orig_on_transcribed = on_transcribed
     @session.on("user_input_transcribed")
     def on_transcribed_with_activity(event):
@@ -342,10 +345,13 @@ async def entrypoint(ctx: JobContext):
         _orig_on_transcribed(event)
 
     async def silence_watchdog():
-        SILENCE_THRESHOLD = 240
-        FINAL_WAIT = 60
+        """監控用戶靜默，超時自動掛斷"""
+        SILENCE_THRESHOLD = 240  # 秒
+        FINAL_WAIT = 60          # 詢問後再等幾秒
+
         while True:
-            await asyncio.sleep(10)
+            await asyncio.sleep(10)  # 每 10 秒檢查一次
+            # 檢查房間是否還連線
             try:
                 state = ctx.room.connection_state
                 if isinstance(state, int) and state != 1:
@@ -358,6 +364,7 @@ async def entrypoint(ctx: JobContext):
             silence_duration = time.time() - _last_activity_time[0]
             if silence_duration > SILENCE_THRESHOLD:
                 logger.info(f"⏰ 靜默 {silence_duration:.0f}s，詢問用戶是否在線...")
+                # 通知前端：靜默提醒
                 try:
                     await ctx.room.local_participant.publish_data(
                         json.dumps({"type": "silence_warning"}).encode(),
@@ -371,10 +378,12 @@ async def entrypoint(ctx: JobContext):
                 except RuntimeError as e:
                     logger.warning(f"⏰ silence_watchdog: session 已結束，安全退出 ({e})")
                     break
+                # 等 60 秒看有沒有回應
                 turns_before = jackma.metrics["turns"]
                 await asyncio.sleep(FINAL_WAIT)
                 if jackma.metrics["turns"] == turns_before:
                     logger.info("⏰ 用戶無回應，自動掛斷")
+                    # 通知前端：自動掛斷
                     try:
                         await ctx.room.local_participant.publish_data(
                             json.dumps({"type": "auto_hangup"}).encode(),
@@ -388,11 +397,20 @@ async def entrypoint(ctx: JobContext):
                     except RuntimeError as e:
                         logger.warning(f"⏰ silence_watchdog: session 已結束，安全退出 ({e})")
                         break
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(5)  # 等 TTS 播完
                     await ctx.room.disconnect()
                     return
                 else:
                     logger.info("✅ 用戶回應了，繼續通話")
-                    _last_activity_time[0] = time.time()
+                    _last_activity_time[0] = time.time()  # 重置靜默計時
 
+    # 啟動靜默監控
     asyncio.create_task(silence_watchdog())
+# trigger rebuild 1774420420
+# force agent restart 1774482745
+# rebuild 1774520514
+# claude haiku 1774525729
+# deepgram key fix 1774703400
+# trigger deploy 1774947183
+# livekit secrets updated 1775004458
+# force livekit secrets reload 1775062196
