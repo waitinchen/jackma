@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 AUDIO_MAX_AGE_SECONDS = 600  # 10 分鐘
 
 # MiniMax TTS API
-MINIMAX_TTS_URL = "https://api.minimax.chat/v1/t2a_v2"
+MINIMAX_TTS_URL = "https://api.minimax.io/v1/t2a_v2"
 
 
 def _cleanup_old_audio_files():
