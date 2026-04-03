@@ -90,13 +90,19 @@ SYSTEM_PROMPT = """
 - 直接理解用戶想表達的意思，正常回應即可
 """
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+_genai_model = None
 
-print("DEBUG: Initializing LLM with model: gemini-2.5-flash")
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash", 
-    system_instruction=SYSTEM_PROMPT
-)
+def _get_model():
+    """惰性載入 Gemini — 避免 Agent import 時觸發不必要的初始化"""
+    global _genai_model
+    if _genai_model is None:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        print("DEBUG: Initializing LLM with model: gemini-2.5-flash")
+        _genai_model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=SYSTEM_PROMPT
+        )
+    return _genai_model
 
 def clean_reply_text(text: str, user_names: list[str] = None) -> str:
     """清理 LLM 回覆中的語氣詞和重複稱呼"""
@@ -205,7 +211,7 @@ async def generate_reply(
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
 
-    response = await model.generate_content_async(
+    response = await _get_model().generate_content_async(
         user_input,
         generation_config=genai.types.GenerationConfig(
             candidate_count=1,
@@ -298,7 +304,7 @@ async def generate_reply_stream(
     }
 
     try:
-        response = await model.generate_content_async(
+        response = await _get_model().generate_content_async(
             user_input,
             generation_config=genai.types.GenerationConfig(
                 candidate_count=1,
