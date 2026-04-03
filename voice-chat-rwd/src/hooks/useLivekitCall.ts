@@ -31,11 +31,14 @@ export type ConvStatus =
 export interface UseLivekitCallReturn {
   isConnected: boolean;
   isConnecting: boolean;
+  isPreparing: boolean;  // 預連結中（進入頁面自動觸發）
+  isPrepared: boolean;   // 預連結完成，可以按撥號
   error: string | null;
   userTranscript: string;
   agentResponse: string;
   status: ConvStatus;
-  startConversation: () => Promise<void>;
+  prepareConnection: () => Promise<void>;  // 預連結（進入頁面就呼叫）
+  startConversation: () => Promise<void>;  // 開始對話（按綠色鈕）
   stopConversation: () => { role: string; content: string }[];
   inputLevelRef: React.MutableRefObject<number>;
   outputAnalyser: AnalyserNode | null;
@@ -76,6 +79,8 @@ export interface UseLivekitCallReturn {
 export function useLivekitCall(): UseLivekitCallReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [isPrepared, setIsPrepared] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userTranscript, setUserTranscript] = useState('');
   const [agentResponse, setAgentResponse] = useState('');
@@ -187,13 +192,15 @@ export function useLivekitCall(): UseLivekitCallReturn {
     }
   }, []);
 
-  const startConversation = useCallback(async () => {
-    setIsConnecting(true);
+  // ===== 預連結：進入通話頁面就建 Room + Connect（麥克風關著） =====
+  const prepareConnection = useCallback(async () => {
+    if (roomRef.current || isPreparing || isPrepared) return; // 避免重複呼叫
+    setIsPreparing(true);
     setError(null);
     transcriptRef.current = [];
 
     try {
-      // 取得 LiveKit Token
+      console.log('🔧 預連結：取得 token...');
       const { token, url } = await getLivekitToken();
 
       const room = new Room({
@@ -202,7 +209,7 @@ export function useLivekitCall(): UseLivekitCallReturn {
       });
       roomRef.current = room;
 
-      // lk.transcription 文字流（與 RoomEvent.TranscriptionReceived 二選一或並存，依伺服器／SDK 版本）
+      // 設定所有事件監聽（跟原本一樣）
       const onTranscriptionTextStream = async (
         reader: { readAll: () => Promise<string>; info?: { attributes?: Record<string, string> } },
         participantInfo: { identity: string },
@@ -216,18 +223,10 @@ export function useLivekitCall(): UseLivekitCallReturn {
           const pid = participantInfo.identity;
           if (pid === localId) {
             lastSttTime.current = Date.now();
-            setHealth((h) => ({
-              ...h,
-              stt: true,
-              sttDetail: isFinal ? '轉錄成功' : '轉錄中',
-            }));
+            setHealth((h) => ({ ...h, stt: true, sttDetail: isFinal ? '轉錄成功' : '轉錄中' }));
           } else {
             lastLlmTime.current = Date.now();
-            setHealth((h) => ({
-              ...h,
-              llm: true,
-              llmDetail: isFinal ? '已回應' : '回覆中',
-            }));
+            setHealth((h) => ({ ...h, llm: true, llmDetail: isFinal ? '已回應' : '回覆中' }));
           }
         } catch (e) {
           console.warn('lk.transcription stream read failed:', e);
@@ -237,16 +236,12 @@ export function useLivekitCall(): UseLivekitCallReturn {
         room.registerTextStreamHandler(LK_TOPIC_TRANSCRIPTION, onTranscriptionTextStream);
       }
 
-      // 監聽 Agent 音訊軌道
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
-          // track.attach() 負責播放（建立 DOM <audio> 元素）
           const el = track.attach();
           el.id = 'agent-audio';
           document.body.appendChild(el);
-          // clone track 做波形分析（不影響播放）
           attachOutputAnalyser(track);
-          // 真實 TTS 健康：收到 Agent 音訊軌道
           lastTtsTime.current = Date.now();
           setHealth(h => ({ ...h, tts: true, ttsDetail: '音訊就緒', spk: true }));
         }
@@ -256,12 +251,10 @@ export function useLivekitCall(): UseLivekitCallReturn {
         track.detach().forEach((el) => el.remove());
       });
 
-      // 監聽 Agent 狀態變化（透過 data channel）
       room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
           const localId = room.localParticipant?.identity ?? '';
-          // LiveKit Agents 透過 data channel 發送 transcription 和狀態
           const transcriptionLike =
             msg.type === 'transcription' ||
             msg.type === 'user_input_transcribed' ||
@@ -269,9 +262,7 @@ export function useLivekitCall(): UseLivekitCallReturn {
           if (transcriptionLike) {
             const text = String(msg.text ?? msg.transcript ?? '').trim();
             const pid =
-              msg.participant_identity ??
-              msg.participantIdentity ??
-              msg.identity ??
+              msg.participant_identity ?? msg.participantIdentity ?? msg.identity ??
               (participant && participant.identity !== localId ? participant.identity : undefined);
             if (text && pid === localId) {
               setUserTranscript(text);
@@ -300,32 +291,20 @@ export function useLivekitCall(): UseLivekitCallReturn {
               setTimeout(() => setStatus('listening'), 800);
             }
           }
-          // 靜默/掛斷事件（Agent 透過 data channel 通知）
-          if (msg.type === 'silence_warning') {
-            setStatus('silence_warning');
-          }
-          if (msg.type === 'auto_hangup') {
-            setStatus('auto_hangup');
-          }
+          if (msg.type === 'silence_warning') setStatus('silence_warning');
+          if (msg.type === 'auto_hangup') setStatus('auto_hangup');
           if (msg.type === 'tts_info') {
-            const label = `${msg.provider} · ${msg.model}`;
-            setHealth(h => ({ ...h, ttsProvider: label }));
+            setHealth(h => ({ ...h, ttsProvider: `${msg.provider} · ${msg.model}` }));
           }
-        } catch {
-          // 非 JSON data，忽略
-        }
+        } catch { /* 非 JSON data */ }
       });
 
-      // 監聽 transcription 事件（LiveKit Agents SDK 自動發送）
       room.on(RoomEvent.TranscriptionReceived, (segments, participant) => {
         const text = segments.map((s) => s.text).join(' ').trim();
         if (!text) return;
-
         const localId = room.localParticipant?.identity ?? '';
         const seg0 = segments[0] as { participantIdentity?: string } | undefined;
-        const inferredId =
-          participant?.identity ?? seg0?.participantIdentity;
-
+        const inferredId = participant?.identity ?? seg0?.participantIdentity;
         if (inferredId === localId) {
           setUserTranscript(text);
           setStatus('thinking');
@@ -340,7 +319,6 @@ export function useLivekitCall(): UseLivekitCallReturn {
         }
       });
 
-      // 監聽 Agent 開始/停止說話
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const agentSpeaking = speakers.some(s => s !== room.localParticipant);
         const userSpeaking = speakers.some(s => s === room.localParticipant);
@@ -351,38 +329,63 @@ export function useLivekitCall(): UseLivekitCallReturn {
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         console.log('Room disconnected:', reason);
         setIsConnected(false);
+        setIsPrepared(false);
         setHealth(h => ({
           ...h, net: false, netDetail: '斷線',
-          stt: false, sttDetail: '斷線',
-          llm: false, llmDetail: '斷線',
+          stt: false, sttDetail: '斷線', llm: false, llmDetail: '斷線',
           tts: false, ttsDetail: '斷線',
         }));
       });
 
-      // 重新連線狀態
       room.on(RoomEvent.Reconnecting, () => {
-        console.log('🔄 Reconnecting...');
         setStatus('reconnecting');
         setHealth(h => ({ ...h, net: false, netDetail: '重新連線中' }));
       });
-
       room.on(RoomEvent.Reconnected, () => {
-        console.log('✅ Reconnected!');
         setStatus('listening');
         setHealth(h => ({ ...h, net: true, netDetail: '已連線' }));
       });
 
-      // 連線到 LiveKit Room
+      // 連線到 LiveKit Room（麥克風先不開）
       await room.connect(url, token);
 
-      // 開啟麥克風
-      await room.localParticipant.setMicrophoneEnabled(true);
+      setIsPreparing(false);
+      setIsPrepared(true);
+      setHealth(h => ({ ...h, net: true, netDetail: '已連線', mem: true }));
+      console.log('🔧 預連結完成！room:', room.name, '— 等待用戶按撥號鈕');
 
-      // 取得麥克風 stream 做音量監控 + 設備名稱
-      const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    } catch (e: any) {
+      console.error('預連結失敗:', e);
+      setError(e.message || '預連結失敗');
+      setIsPreparing(false);
+    }
+  }, [isPreparing, isPrepared, attachOutputAnalyser]);
+
+  // ===== 開始對話：用戶按綠色鈕，只開麥克風 =====
+  const startConversation = useCallback(async () => {
+    const room = roomRef.current;
+
+    // 如果還沒預連結，走原本的完整流程
+    if (!room || !isPrepared) {
+      console.log('⚠️ 未預連結，走完整連線流程');
+      setIsConnecting(true);
+      if (!room) {
+        await prepareConnection();
+      }
+    }
+
+    setIsConnecting(true);
+    try {
+      const r = roomRef.current;
+      if (!r) throw new Error('Room 未建立');
+
+      // 開啟麥克風
+      await r.localParticipant.setMicrophoneEnabled(true);
+
+      // 監控麥克風音量 + 設備名稱
+      const micPub = r.localParticipant.getTrackPublication(Track.Source.Microphone);
       if (micPub?.track?.mediaStream) {
         startInputMonitor(micPub.track.mediaStream);
-        // 取得麥克風設備名稱
         const audioTracks = micPub.track.mediaStream.getAudioTracks();
         if (audioTracks.length > 0) {
           const deviceLabel = audioTracks[0].label || '未知設備';
@@ -394,21 +397,15 @@ export function useLivekitCall(): UseLivekitCallReturn {
       setIsConnected(true);
       setIsConnecting(false);
       setStatus('listening');
-      // 真實 NET 健康：WebRTC 連線成功
-      setHealth(h => ({
-        ...h,
-        net: true, netDetail: '已連線',
-        mic: true, // 麥克風已開啟
-        mem: true,  // Agent 端會載入 memory
-      }));
-      console.log('✅ LiveKit room connected:', room.name);
+      setHealth(h => ({ ...h, mic: true }));
+      console.log('✅ 通話開始（麥克風已開啟）');
 
     } catch (e: any) {
-      console.error('LiveKit connection failed:', e);
-      setError(e.message || '連線失敗');
+      console.error('開始通話失敗:', e);
+      setError(e.message || '開始通話失敗');
       setIsConnecting(false);
     }
-  }, [attachOutputAnalyser, startInputMonitor]);
+  }, [isPrepared, prepareConnection, startInputMonitor]);
 
   const stopConversation = useCallback(() => {
     // 停止音量監控
@@ -493,10 +490,13 @@ export function useLivekitCall(): UseLivekitCallReturn {
   return {
     isConnected,
     isConnecting,
+    isPreparing,
+    isPrepared,
     error,
     userTranscript,
     agentResponse,
     status,
+    prepareConnection,
     startConversation,
     stopConversation,
     inputLevelRef,

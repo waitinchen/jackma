@@ -93,10 +93,13 @@ export default function Call() {
   const {
     isConnected,
     isConnecting,
+    isPreparing,
+    isPrepared,
     error: convError,
     userTranscript,
     agentResponse,
     status: convStatus,
+    prepareConnection,
     startConversation,
     stopConversation,
     inputLevelRef,
@@ -149,6 +152,11 @@ export default function Call() {
     }, 1000);
     return () => clearInterval(timer);
   }, [callActive]);
+
+  // 進入頁面就預連結 LiveKit（不開麥克風，Agent 開始準備 prompt）
+  useEffect(() => {
+    prepareConnection();
+  }, [prepareConnection]);
 
   const resolveAutoDial = () => {
     // 檢查 URL 路徑：/realtime 或 /call 都支援自動撥號
