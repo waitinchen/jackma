@@ -198,7 +198,10 @@ async def entrypoint(ctx: JobContext):
 
     # P3: Deepgram Nova-2 STT — 中文支援，無串流時間限制
     # Nova-3 中文尚未支援（400 error），用 Nova-2
-    stt_keywords = [("马云", 10.0)]
+    stt_keywords = [
+        ("马云", 10.0), ("阿里巴巴", 5.0), ("创业", 3.0), ("淘宝", 5.0),
+        ("支付宝", 5.0), ("电商", 3.0), ("语气灵", 5.0), ("威廷", 8.0),
+    ]
     deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
     if deepgram_key:
         logger.info(f"STT: Deepgram Nova-2 (keywords: {stt_keywords})")
