@@ -40,6 +40,32 @@ from agent.transcript_saver import save_transcript
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("jackma-agent")
 
+# 預載 Silero VAD — 啟動時一次，通話時直接用（省 3-5s）
+logger.info("Pre-loading Silero VAD model...")
+try:
+    _preloaded_vad = silero.VAD.load(
+        min_silence_duration=0.4,
+        prefix_padding_duration=0.3,
+        min_speech_duration=0.1,
+        activation_threshold=0.5,
+    )
+    logger.info("Silero VAD pre-loaded successfully")
+except Exception as e:
+    logger.error(f"Silero VAD pre-load failed: {e}")
+    _preloaded_vad = None
+
+# 預熱 Cloud SQL 連線池 — 首次連線需要 Cloud SQL Proxy 建連（3-5s）
+logger.info("Pre-warming Cloud SQL connection pool...")
+try:
+    from sqlalchemy import text as sa_text
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    db.execute(sa_text("SELECT 1"))
+    db.close()
+    logger.info("Cloud SQL connection pool pre-warmed successfully")
+except Exception as e:
+    logger.warning(f"DB pre-warm failed (will connect on first call): {e}")
+
 
 class JackMaAgent:
     """馬雲語氣靈 Agent — 管理通話生命周期與指標"""
@@ -132,18 +158,20 @@ async def entrypoint(ctx: JobContext):
 
     # 組裝馬雲系統提示（包含用戶上下文）
     logger.info(f"Building JackMa prompt for user {user_id}...")
-    system_prompt = build_jackma_prompt(user_id)
+    system_prompt = await build_jackma_prompt(user_id)
     logger.info(f"System prompt built: {len(system_prompt)} chars")
 
-    # P1: 配置 VAD 參數 — 優化 turn detection
-    # min_silence_duration: 停頓多久才判定為「講完」（越長越不容易搶話）
-    # prefix_padding_duration: 保留語音開頭的靜音段（避免截斷開頭字）
-    vad = silero.VAD.load(
-        min_silence_duration=0.4,       # 400ms 靜音才判定講完（降低 200ms 體感延遲）
-        prefix_padding_duration=0.3,    # 保留 300ms 開頭
-        min_speech_duration=0.1,        # 最短語音長度
-        activation_threshold=0.5,       # 語音偵測門檻
-    )
+    # VAD — 用預載的，失敗才即時載入
+    if _preloaded_vad is not None:
+        vad = _preloaded_vad
+    else:
+        logger.warning("Using on-demand VAD load (pre-load failed)")
+        vad = silero.VAD.load(
+            min_silence_duration=0.4,
+            prefix_padding_duration=0.3,
+            min_speech_duration=0.1,
+            activation_threshold=0.5,
+        )
 
     # ===== 馬雲語氣靈 TTS — 只用 MiniMax，無 fallback =====
     JACKMA_VOICE_ID = "moss_audio_062371e7-2c0c-11f1-a44a-c658cff0ef65"
