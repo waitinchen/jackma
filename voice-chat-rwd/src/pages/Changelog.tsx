@@ -5,6 +5,48 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const CHANGELOG = [
   {
+    version: "v3.0.3",
+    date: "2026-04-03 12:00",
+    changes: [
+      { type: "feat", text: "前端預連結：進入通話頁面就建立 LiveKit 連線，按撥號鈕只開麥克風，體感延遲大幅縮短" },
+      { type: "fix", text: "強化 STT 容錯指令：LLM 不再提及「聽不清」「含糊」，改為推斷用戶意圖" },
+      { type: "feat", text: "Deepgram 關鍵字擴充至 8 組（馬雲、阿里巴巴、淘寶等），提升語音辨識準確度" },
+    ],
+  },
+  {
+    version: "v3.0.2",
+    date: "2026-04-02 16:00",
+    changes: [
+      { type: "fix", text: "Agent 架構：Gemini 惰性載入（省 3-5s）+ VAD 預載 + DB 預熱 + DB 查詢並行化" },
+      { type: "fix", text: "LiveKit secrets 隔離：馬雲用 jackma-livekit-* 獨立密鑰，避免與江彬 Agent 衝突" },
+      { type: "fix", text: "API 端 TTS：注入 MiniMax secrets + 修正 API URL（api.minimax.chat → api.minimax.io）" },
+    ],
+  },
+  {
+    version: "v3.0.1",
+    date: "2026-04-01 09:00",
+    changes: [
+      { type: "fix", text: "Agent TTS：硬編碼馬雲 voice_id，刪除 ElevenLabs fallback（防止跳到江彬聲音）" },
+      { type: "fix", text: "Dockerfile：移除已刪除的 jiangbin.md 引用，修復部署失敗" },
+      { type: "feat", text: "LiveKit Cloud：新建 JackMa_V1 project，完全隔離江彬的 LiveKit 環境" },
+      { type: "feat", text: "Domain：jackma.tonetown.ai 上線（GoDaddy CNAME + Cloud Run domain mapping + SSL）" },
+    ],
+  },
+  {
+    version: "v3.0.0",
+    date: "2026-03-31 15:00",
+    changes: [
+      { type: "feat", text: "馬雲語氣靈 1.0 全面上線 — 江彬→馬雲全面改造" },
+      { type: "feat", text: "人格：馬雲靈魂檔 v2（創業心智教練，四拍結構語氣模型）" },
+      { type: "feat", text: "代碼：所有 jiangbin→jackma（class, function, variable, 72+ 檔案）" },
+      { type: "feat", text: "TTS：MiniMax 馬雲克隆聲紋（voice_id: moss_audio_062371e7）" },
+      { type: "feat", text: "LLM：Claude Haiku 4.5（Agent 通話）/ Gemini 2.5 Flash（文字聊天）" },
+      { type: "feat", text: "STT：Deepgram Nova-2（中文）" },
+      { type: "feat", text: "GCP：新建 jackma-db, jackma-repo, jackma-images" },
+      { type: "feat", text: "頭像：馬雲照片替換所有 icon/PWA 圖示" },
+    ],
+  },
+  {
     version: "v2.6.2",
     date: "2026-03-29 10:00",
     changes: [
