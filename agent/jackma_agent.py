@@ -221,23 +221,35 @@ async def entrypoint(ctx: JobContext):
             keywords=stt_keywords,
         )
 
-    # Claude LLM（Haiku 4.5 — 快速、低延遲）
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if anthropic_key:
-        logger.info("LLM: Claude Haiku 4.5")
+    # MiniMax M2.7 LLM — 透過 Anthropic 兼容 API
+    # base_url: https://api.minimax.io/anthropic
+    # api_key: 用 MINIMAX_API_KEY（與 TTS 共用）
+    minimax_key = settings.MINIMAX_API_KEY
+    if minimax_key:
+        logger.info("LLM: MiniMax M2.7 (via Anthropic-compatible API)")
         llm = anthropic.LLM(
-            model="claude-haiku-4-5-20251001",
-            api_key=anthropic_key,
+            model="MiniMax-M2.7",
+            api_key=minimax_key,
+            base_url="https://api.minimax.io/anthropic",
             temperature=0.7,
         )
     else:
-        # Fallback to Gemini
-        logger.info("LLM: Gemini 2.5 Flash (Anthropic key not set)")
-        llm = google.LLM(
-            model="gemini-2.5-flash",
-            temperature=0.7,
-            api_key=gemini_key,
-        )
+        # Fallback to Claude
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if anthropic_key:
+            logger.info("LLM: Claude Haiku 4.5 (MiniMax key not set, fallback)")
+            llm = anthropic.LLM(
+                model="claude-haiku-4-5-20251001",
+                api_key=anthropic_key,
+                temperature=0.7,
+            )
+        else:
+            logger.info("LLM: Gemini 2.5 Flash (no Anthropic/MiniMax key)")
+            llm = google.LLM(
+                model="gemini-2.5-flash",
+                temperature=0.7,
+                api_key=gemini_key,
+            )
 
     # 房間斷線時儲存 transcript 和指標
     @ctx.room.on("disconnected")

@@ -2,9 +2,8 @@ import os
 import re
 import logging
 from datetime import datetime, timezone, timedelta
-import google.generativeai as genai
+import anthropic
 from app.core.config import settings
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
@@ -105,54 +104,51 @@ SYSTEM_PROMPT = """
 把 STT 輸入當作「寫了錯字的簡訊」——你不會跟朋友說「你這簡訊打得有點含糊」，你會直接理解他的意思然後回覆。
 """
 
-_genai_model = None
+# MiniMax M2.7 — 透過 Anthropic 兼容 API
+_client = None
 
-def _get_model():
-    """惰性載入 Gemini — 避免 Agent import 時觸發不必要的初始化"""
-    global _genai_model
-    if _genai_model is None:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        print("DEBUG: Initializing LLM with model: gemini-2.5-flash")
-        _genai_model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=SYSTEM_PROMPT
+def _get_client():
+    """惰性載入 MiniMax M2.7 client"""
+    global _client
+    if _client is None:
+        api_key = settings.MINIMAX_API_KEY
+        if not api_key:
+            raise ValueError("MINIMAX_API_KEY 未設定")
+        _client = anthropic.AsyncAnthropic(
+            api_key=api_key,
+            base_url="https://api.minimax.io/anthropic",
         )
-    return _genai_model
+        print("DEBUG: Initializing LLM with MiniMax M2.7 (Anthropic-compatible)")
+    return _client
+
+MINIMAX_MODEL = "MiniMax-M2.7"
+
 
 def clean_reply_text(text: str, user_names: list[str] = None) -> str:
     """清理 LLM 回覆中的語氣詞和重複稱呼"""
-    # 移除開頭的「喔/噢/嗯 + 逗號 + 名字 + 逗號」模式（如「喔，文翊，」）
     if user_names:
         for name in user_names:
             if name:
-                # 「喔，文翊，」「噢，文翊，」「嗯，文翊，」
                 text = re.sub(rf'^[喔噢嗯啊唉欸哎][，,、]?\s*{re.escape(name)}[啊阿呀]?[，,、]?\s*', '', text)
-                # 「文翊啊，」「文翊阿，」「文翊呀，」
                 text = re.sub(rf'^{re.escape(name)}[啊阿呀][，,、]?\s*', '', text)
-                # 「文翊，」
                 text = re.sub(rf'^{re.escape(name)}[，,、]\s*', '', text)
-    # 硬編碼移除「文翊啊，」「喔，文翊，」（保底）
     text = re.sub(r'^[喔噢嗯啊唉欸哎][，,、]?\s*文翊[啊阿呀]?[，,、]?\s*', '', text)
     text = re.sub(r'^文翊[啊阿][，,、]?\s*', '', text)
-    # 移除開頭的「欸，XXX啊，」
     text = re.sub(r'^欸[，,、]?\s*[^\s，,]{1,10}(啊|呀|喔)?[，,、]?\s*', '', text)
     text = re.sub(r'^欸[，,、]\s*', '', text)
-    # 移除笑聲
     text = re.sub(r'哈哈+|呵呵+|嘿嘿+|哈+', '', text)
     text = re.sub(r'哎呀[，,]?\s*', '', text)
     text = re.sub(r'哎喲[，,]?\s*', '', text)
-    # 移除句首語助詞
     text = re.sub(r'^[欸唉誒哎喔噢啊呀嗯][？?，,、]?\s*', '', text)
     text = re.sub(r'^[欸唉誒哎喔噢啊呀嗯][？?，,、]?\s*', '', text)
-    # 清理標點
     text = re.sub(r'[，,]{2,}', '，', text)
     text = re.sub(r'^[，,、\s！!？?]+', '', text)
     return text.strip()
 
 
 async def generate_reply(
-    user_text: str, 
-    memories: list[str], 
+    user_text: str,
+    memories: list[str],
     user_id: str = None,
     user_profile_context: str = "",
     user_events_context: str = "",
@@ -161,18 +157,17 @@ async def generate_reply(
     key_notes_context: str = "",
     conversation_history: list[dict] = None
 ) -> str:
-    """呼叫 LLM 生成回覆"""
-    
+    """呼叫 MiniMax M2.7 生成回覆"""
+
     suspicious_patterns = [r'打賞', r'明鏡', r'點點']
     is_suspicious = any(re.search(p, user_text) for p in suspicious_patterns)
-    
+
     if is_suspicious and len(user_text.strip()) < 15:
         return "我沒聽清楚，你再說一次好嗎？"
-    
+
     memory_context = "\n".join([f"- {m}" for m in memories]) if memories else ""
     prompt_parts = []
-    
-    # 從 user_profile_context 解析用戶名字，用於清理回覆中的稱呼
+
     user_names = []
     if user_profile_context:
         for line in user_profile_context.split('\n'):
@@ -180,14 +175,13 @@ async def generate_reply(
                 user_names.append(line.split('用戶姓名：')[-1].strip())
             elif '我叫他：' in line:
                 user_names.append(line.split('我叫他：')[-1].strip())
-    
-    # 注入當前時間（GMT+8 台灣時間）
+
     tw_tz = timezone(timedelta(hours=8))
     now = datetime.now(tw_tz)
     weekday_names = ['一', '二', '三', '四', '五', '六', '日']
     time_str = now.strftime(f"%Y年%m月%d日 星期{weekday_names[now.weekday()]} %H:%M")
     prompt_parts.append(f"【當前時間】{time_str}\n（請根據對話紀錄的時間戳判斷時間遠近：同一天內的事用「剛才」「剛剛」，昨天的用「昨天」，超過兩天才用「前幾天」「上次」。絕對不要把幾分鐘前的事說成「上次」「之前」。）")
-    
+
     if user_profile_context:
         prompt_parts.append(user_profile_context)
     if key_notes_context:
@@ -200,7 +194,7 @@ async def generate_reply(
         prompt_parts.append(proactive_care_context)
     if memory_context:
         prompt_parts.append(f"【記憶參考】\n{memory_context}")
-    
+
     if conversation_history:
         history_lines = []
         for msg in conversation_history:
@@ -208,47 +202,29 @@ async def generate_reply(
             content = msg['content']
             if role_label == "馬雲":
                 content = clean_reply_text(content, user_names=user_names)
-            # 加上時間戳（如果有的話）
             time_prefix = ""
             if msg.get("created_at"):
                 time_prefix = f"[{msg['created_at']}] "
             history_lines.append(f"{time_prefix}{role_label}：{content}")
         if history_lines:
             prompt_parts.append(f"【對話紀錄】\n" + "\n".join(history_lines))
-    
+
     prompt_parts.append(f"【用戶說】\n{user_text}")
     user_input = "\n\n".join(prompt_parts)
 
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-
-    response = await _get_model().generate_content_async(
-        user_input,
-        generation_config=genai.types.GenerationConfig(
-            candidate_count=1,
-            max_output_tokens=2048,
-            temperature=0.7,
-        ),
-        safety_settings=safety_settings
-    )
-
-    if not response.candidates:
-        return "[系統提示：AI 暫時無法回應。]"
-
-    cand = response.candidates[0]
-    if not cand.content or not cand.content.parts:
-        fr = getattr(cand, "finish_reason", None) or "Unknown"
-        return f"[系統提示：AI 暫時無法回應。原因碼：{fr}]"
-
     try:
-        reply_text = response.text.strip()
-    except ValueError as e:
-        # 封鎖、無效候選等情況下 .text 會拋錯
-        logger.warning("Gemini response.text unavailable: %s", e)
+        client = _get_client()
+        response = await client.messages.create(
+            model=MINIMAX_MODEL,
+            max_tokens=2048,
+            temperature=0.7,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_input}],
+        )
+
+        reply_text = response.content[0].text.strip()
+    except Exception as e:
+        logger.error(f"MiniMax M2.7 error: {e}")
         return "我這邊剛才沒接收到完整回覆，你再說一次好嗎？"
 
     print(f"[DEBUG] LLM原始: {reply_text[:80]}...")
@@ -268,7 +244,7 @@ async def generate_reply_stream(
     key_notes_context: str = "",
     conversation_history: list[dict] = None
 ):
-    """串流版 LLM — 逐 chunk yield 文字，前端可即時顯示"""
+    """串流版 LLM — 逐 chunk yield 文字"""
 
     suspicious_patterns = [r'打賞', r'明鏡', r'點點']
     is_suspicious = any(re.search(p, user_text) for p in suspicious_patterns)
@@ -311,28 +287,17 @@ async def generate_reply_stream(
     prompt_parts.append(f"【用戶說】\n{user_text}")
     user_input = "\n\n".join(prompt_parts)
 
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-
     try:
-        response = await _get_model().generate_content_async(
-            user_input,
-            generation_config=genai.types.GenerationConfig(
-                candidate_count=1,
-                max_output_tokens=2048,
-                temperature=0.7,
-            ),
-            safety_settings=safety_settings,
-            stream=True,
-        )
-
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        client = _get_client()
+        async with client.messages.stream(
+            model=MINIMAX_MODEL,
+            max_tokens=2048,
+            temperature=0.7,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_input}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
     except Exception as e:
-        logger.error(f"LLM streaming error: {e}")
+        logger.error(f"MiniMax M2.7 streaming error: {e}")
         yield "我這邊剛才沒接收到完整回覆，你再說一次好嗎？"
