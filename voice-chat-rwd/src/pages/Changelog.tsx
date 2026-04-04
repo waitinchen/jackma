@@ -5,6 +5,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const CHANGELOG = [
   {
+    version: "v3.0.4",
+    date: "2026-04-03 16:00",
+    changes: [
+      { type: "feat", text: "LLM 全面切換 MiniMax M2.7（即時對話 + 文字聊天），透過 Anthropic 兼容 API" },
+      { type: "fix", text: "更新日誌補齊 v3.0.0 ~ v3.0.3 完整改造記錄" },
+    ],
+  },
+  {
     version: "v3.0.3",
     date: "2026-04-03 12:00",
     changes: [
