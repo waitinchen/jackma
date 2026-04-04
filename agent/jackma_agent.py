@@ -226,9 +226,9 @@ async def entrypoint(ctx: JobContext):
     # api_key: 用 MINIMAX_API_KEY（與 TTS 共用）
     minimax_key = settings.MINIMAX_API_KEY
     if minimax_key:
-        logger.info("LLM: MiniMax M2.7 (via Anthropic-compatible API)")
+        logger.info("LLM: MiniMax M2.7-highspeed (via Anthropic-compatible API)")
         llm = anthropic.LLM(
-            model="MiniMax-M2.7",
+            model="MiniMax-M2.7-highspeed",
             api_key=minimax_key,
             base_url="https://api.minimax.io/anthropic",
             temperature=0.7,

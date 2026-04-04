@@ -591,7 +591,7 @@ export default function Call() {
             {([
               { key: 'MIC', ok: health.mic && !muted, detail: muted ? '已靜音' : health.micDevice || (health.mic ? '收到音訊' : '無訊號') },
               { key: 'STT', ok: health.stt || health.llm, detail: health.stt ? `Deepgram Nova-2 · ${health.sttDetail}` : (health.llm ? 'Deepgram Nova-2 · 就緒' : health.sttDetail) },
-              { key: 'LLM', ok: health.llm, detail: health.llm ? `MiniMax M2.7 · ${health.llmDetail}` : health.llmDetail },
+              { key: 'LLM', ok: health.llm, detail: health.llm ? `MiniMax M2.7-HS · ${health.llmDetail}` : health.llmDetail },
               { key: 'TTS', ok: health.tts, detail: health.tts ? (health.ttsProvider || 'MiniMax · speech-02-turbo') : health.ttsDetail },
               { key: 'NET', ok: health.net, detail: health.net ? `LiveKit JackMa_V1 · ${health.netDetail}` : health.netDetail },
               { key: 'SPK', ok: health.spk && speakerOn, detail: speakerOn ? (health.spk ? '正常' : '無輸出') : '已關閉' },
