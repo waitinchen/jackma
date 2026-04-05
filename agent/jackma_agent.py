@@ -128,6 +128,22 @@ class JackMaAgent:
         )
 
 
+class JackMaVoiceAgent(Agent):
+    """馬雲語音 Agent — 過濾空訊息 + 截斷上下文，防止 API 400 error"""
+
+    MAX_LLM_ITEMS = 40  # 最多保留 40 items（約 20 輪對話）
+
+    async def llm_node(self, chat_ctx, tools, model_settings):
+        """在送進 LLM 前：過濾空 user messages + 截斷對話歷史"""
+        try:
+            chat_ctx = chat_ctx.copy(exclude_empty_message=True)
+            chat_ctx.truncate(self.MAX_LLM_ITEMS)
+        except Exception as e:
+            logger.warning(f"chat_ctx sanitize failed: {e}")
+        async for chunk in super().llm_node(chat_ctx, tools, model_settings):
+            yield chunk
+
+
 async def entrypoint(ctx: JobContext):
     """LiveKit Agent 入口點"""
     logger.info(f"🚀 Received job dispatch! room: {ctx.room.name}")
@@ -343,7 +359,7 @@ async def entrypoint(ctx: JobContext):
     # 啟動 Agent
     await session.start(
         room=ctx.room,
-        agent=Agent(
+        agent=JackMaVoiceAgent(
             instructions=full_prompt,
         ),
         room_input_options=RoomInputOptions(close_on_disconnect=False),
