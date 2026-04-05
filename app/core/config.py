@@ -13,12 +13,10 @@ class Settings(BaseSettings):
 
     # API Keys (GCP 會透過 Secret Manager 注入)
     GEMINI_API_KEY: str = ""
-    OPENAI_API_KEY: str = ""
-    ELEVENLABS_API_KEY: str = ""
-    ELEVENLABS_VOICE_ID: str = ""
-    ELEVENLABS_MODEL_ID: str = "eleven_flash_v2_5"
-    ELEVENLABS_AGENT_ID: str | None = None
-    ELEVENLABS_KB_FOLDER_ID: str | None = None
+    ELEVENLABS_API_KEY: str = ""      # KB 操作仍在用
+    ELEVENLABS_VOICE_ID: str = ""     # KB 操作仍在用
+    ELEVENLABS_AGENT_ID: str | None = None   # turn.py signed-url 在用
+    ELEVENLABS_KB_FOLDER_ID: str | None = None  # elevenlabs_kb.py 在用
 
     # JWT Auth 設定
     JWT_SECRET_KEY: str = "please-change-this-to-a-random-secret-key-at-least-32-chars"
@@ -56,11 +54,10 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = ""
     LIVEKIT_API_SECRET: str = ""
 
-    # MiniMax TTS 設定（優先使用）
+    # MiniMax 設定（TTS + LLM 共用）
     MINIMAX_API_KEY: str = ""
     MINIMAX_GROUP_ID: str = ""
-    MINIMAX_VOICE_ID: str = ""
-    TTS_PROVIDER: str = "minimax"  # "minimax" 或 "elevenlabs"
+    MINIMAX_VOICE_ID: str = ""  # 代碼裡硬編碼更安全，此欄位僅供參考
 
     # Anthropic (Claude) LLM
     ANTHROPIC_API_KEY: str = ""
@@ -83,11 +80,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# 偵錯用：確保金鑰有讀到 (只印出前幾個字)
-if not settings.ELEVENLABS_API_KEY:
-    print("[WARNING] ELEVENLABS_API_KEY is empty - please set it in .env or Secret Manager")
+# 偵錯用：確保主要金鑰有讀到
+if settings.MINIMAX_API_KEY:
+    print(f"[OK] Config loaded. MiniMax Key starts with: {settings.MINIMAX_API_KEY[:8]}...")
 else:
-    print(f"[OK] Config loaded. ElevenLabs Key starts with: {settings.ELEVENLABS_API_KEY[:5]}...")
+    print("[WARNING] MINIMAX_API_KEY is empty - MiniMax LLM+TTS will not work")
 
 # 檢查是否在 Cloud Run 環境
 if os.environ.get("K_SERVICE"):
