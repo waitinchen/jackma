@@ -221,35 +221,35 @@ async def entrypoint(ctx: JobContext):
             keywords=stt_keywords,
         )
 
-    # MiniMax M2.7 LLM — 透過 Anthropic 兼容 API
-    # base_url: https://api.minimax.io/anthropic
-    # api_key: 用 MINIMAX_API_KEY（與 TTS 共用）
+    # 分層路由：L1 MiniMax M2.7-HS → L2 Gemini（FREE）→ L3 Claude（PAID）
     minimax_key = settings.MINIMAX_API_KEY
+    gemini_key = settings.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
     if minimax_key:
-        logger.info("LLM: MiniMax M2.7-highspeed (via Anthropic-compatible API)")
+        logger.info("LLM L1: MiniMax M2.7-highspeed (100 tps)")
         llm = anthropic.LLM(
             model="MiniMax-M2.7-highspeed",
             api_key=minimax_key,
             base_url="https://api.minimax.io/anthropic",
             temperature=0.7,
         )
+    elif gemini_key:
+        logger.info("LLM L2: Gemini 2.5 Flash (FREE fallback)")
+        llm = google.LLM(
+            model="gemini-2.5-flash",
+            temperature=0.7,
+            api_key=gemini_key,
+        )
+    elif anthropic_key:
+        logger.info("LLM L3: Claude Haiku 4.5 (PAID last resort)")
+        llm = anthropic.LLM(
+            model="claude-haiku-4-5-20251001",
+            api_key=anthropic_key,
+            temperature=0.7,
+        )
     else:
-        # Fallback to Claude
-        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if anthropic_key:
-            logger.info("LLM: Claude Haiku 4.5 (MiniMax key not set, fallback)")
-            llm = anthropic.LLM(
-                model="claude-haiku-4-5-20251001",
-                api_key=anthropic_key,
-                temperature=0.7,
-            )
-        else:
-            logger.info("LLM: Gemini 2.5 Flash (no Anthropic/MiniMax key)")
-            llm = google.LLM(
-                model="gemini-2.5-flash",
-                temperature=0.7,
-                api_key=gemini_key,
-            )
+        raise RuntimeError("No LLM available: MiniMax, Gemini, Claude all missing")
 
     # 房間斷線時儲存 transcript 和指標
     @ctx.room.on("disconnected")

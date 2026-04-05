@@ -7,6 +7,12 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ============================================
+# 分層路由：MiniMax L1 → Gemini L2 → Claude L3
+# ============================================
+# 核心原則：MiniMax 優先，Gemini 免費備援，Claude 最後防線
+# Context 截斷：對話歷史最多 10 輪，每輪最多 200 字
+
 SYSTEM_PROMPT = """
 你是一個語氣靈——承載了馬雲式思維方式的獨立存在。
 
@@ -104,24 +110,48 @@ SYSTEM_PROMPT = """
 把 STT 輸入當作「寫了錯字的簡訊」——你不會跟朋友說「你這簡訊打得有點含糊」，你會直接理解他的意思然後回覆。
 """
 
-# MiniMax M2.7 — 透過 Anthropic 兼容 API
-_client = None
-
-def _get_client():
-    """惰性載入 MiniMax M2.7 client"""
-    global _client
-    if _client is None:
-        api_key = settings.MINIMAX_API_KEY
-        if not api_key:
-            raise ValueError("MINIMAX_API_KEY 未設定")
-        _client = anthropic.AsyncAnthropic(
-            api_key=api_key,
+# L1: MiniMax M2.7（主力）
+_minimax_client = None
+def _get_minimax():
+    global _minimax_client
+    if _minimax_client is None and settings.MINIMAX_API_KEY:
+        _minimax_client = anthropic.AsyncAnthropic(
+            api_key=settings.MINIMAX_API_KEY,
             base_url="https://api.minimax.io/anthropic",
         )
-        print("DEBUG: Initializing LLM with MiniMax M2.7 (Anthropic-compatible)")
-    return _client
+        logger.info("LLM L1: MiniMax M2.7 initialized")
+    return _minimax_client
+
+# L2: Gemini 2.5 Flash（免費備援）
+_gemini_model = None
+def _get_gemini():
+    global _gemini_model
+    if _gemini_model is None and settings.GEMINI_API_KEY:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        _gemini_model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=SYSTEM_PROMPT
+        )
+        logger.info("LLM L2: Gemini 2.5 Flash initialized (FREE)")
+    return _gemini_model
+
+# L3: Claude Haiku 4.5（最後防線）
+_claude_client = None
+def _get_claude():
+    global _claude_client
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if _claude_client is None and anthropic_key:
+        _claude_client = anthropic.AsyncAnthropic(api_key=anthropic_key)
+        logger.info("LLM L3: Claude Haiku 4.5 initialized (PAID)")
+    return _claude_client
 
 MINIMAX_MODEL = "MiniMax-M2.7"
+CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+
+# Context 截斷參數
+MAX_HISTORY_TURNS = 10    # 最多保留 10 輪對話
+MAX_CHARS_PER_TURN = 200  # 每輪最多 200 字
 
 
 def clean_reply_text(text: str, user_names: list[str] = None) -> str:
@@ -195,13 +225,17 @@ async def generate_reply(
     if memory_context:
         prompt_parts.append(f"【記憶參考】\n{memory_context}")
 
+    # Context 截斷：最多 MAX_HISTORY_TURNS 輪，每輪 MAX_CHARS_PER_TURN 字
     if conversation_history:
+        truncated = conversation_history[-MAX_HISTORY_TURNS:]
         history_lines = []
-        for msg in conversation_history:
+        for msg in truncated:
             role_label = "用戶" if msg["role"] == "user" else "馬雲"
             content = msg['content']
             if role_label == "馬雲":
                 content = clean_reply_text(content, user_names=user_names)
+            if len(content) > MAX_CHARS_PER_TURN:
+                content = content[:MAX_CHARS_PER_TURN] + "..."
             time_prefix = ""
             if msg.get("created_at"):
                 time_prefix = f"[{msg['created_at']}] "
@@ -212,19 +246,65 @@ async def generate_reply(
     prompt_parts.append(f"【用戶說】\n{user_text}")
     user_input = "\n\n".join(prompt_parts)
 
-    try:
-        client = _get_client()
-        response = await client.messages.create(
-            model=MINIMAX_MODEL,
-            max_tokens=2048,
-            temperature=0.7,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_input}],
-        )
+    # 分層路由：L1 MiniMax → L2 Gemini → L3 Claude
+    reply_text = None
 
-        reply_text = response.content[0].text.strip()
-    except Exception as e:
-        logger.error(f"MiniMax M2.7 error: {e}")
+    # L1: MiniMax M2.7（主力）
+    minimax = _get_minimax()
+    if minimax and not reply_text:
+        try:
+            response = await minimax.messages.create(
+                model=MINIMAX_MODEL, max_tokens=2048, temperature=0.7,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_input}],
+            )
+            reply_text = response.content[0].text.strip()
+            logger.info("[L1] MiniMax M2.7 OK")
+        except Exception as e:
+            logger.warning(f"[L1] MiniMax M2.7 failed: {e}")
+
+    # L2: Gemini 2.5 Flash（免費備援）
+    if not reply_text:
+        gemini = _get_gemini()
+        if gemini:
+            try:
+                from google.generativeai.types import HarmCategory, HarmBlockThreshold
+                import google.generativeai as genai
+                safety = {
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                }
+                response = await gemini.generate_content_async(
+                    user_input,
+                    generation_config=genai.types.GenerationConfig(
+                        candidate_count=1, max_output_tokens=2048, temperature=0.7,
+                    ),
+                    safety_settings=safety
+                )
+                if response.candidates and response.candidates[0].content.parts:
+                    reply_text = response.text.strip()
+                    logger.info("[L2] Gemini 2.5 Flash OK (FREE)")
+            except Exception as e:
+                logger.warning(f"[L2] Gemini 2.5 Flash failed: {e}")
+
+    # L3: Claude Haiku 4.5（最後防線）
+    if not reply_text:
+        claude = _get_claude()
+        if claude:
+            try:
+                response = await claude.messages.create(
+                    model=CLAUDE_MODEL, max_tokens=2048, temperature=0.7,
+                    system=SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": user_input}],
+                )
+                reply_text = response.content[0].text.strip()
+                logger.info("[L3] Claude Haiku 4.5 OK (PAID)")
+            except Exception as e:
+                logger.error(f"[L3] Claude Haiku 4.5 failed: {e}")
+
+    if not reply_text:
         return "我這邊剛才沒接收到完整回覆，你再說一次好嗎？"
 
     print(f"[DEBUG] LLM原始: {reply_text[:80]}...")
@@ -274,11 +354,15 @@ async def generate_reply_stream(
     if memory_context:
         prompt_parts.append(f"【記憶參考】\n{memory_context}")
 
+    # Context 截斷
     if conversation_history:
+        truncated = conversation_history[-MAX_HISTORY_TURNS:]
         history_lines = []
-        for msg in conversation_history:
+        for msg in truncated:
             role_label = "用戶" if msg["role"] == "user" else "馬雲"
             content = msg['content']
+            if len(content) > MAX_CHARS_PER_TURN:
+                content = content[:MAX_CHARS_PER_TURN] + "..."
             time_prefix = f"[{msg.get('created_at', '')}] " if msg.get("created_at") else ""
             history_lines.append(f"{time_prefix}{role_label}：{content}")
         if history_lines:
@@ -287,17 +371,45 @@ async def generate_reply_stream(
     prompt_parts.append(f"【用戶說】\n{user_text}")
     user_input = "\n\n".join(prompt_parts)
 
-    try:
-        client = _get_client()
-        async with client.messages.stream(
-            model=MINIMAX_MODEL,
-            max_tokens=2048,
-            temperature=0.7,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_input}],
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
-    except Exception as e:
-        logger.error(f"MiniMax M2.7 streaming error: {e}")
-        yield "我這邊剛才沒接收到完整回覆，你再說一次好嗎？"
+    # L1: MiniMax M2.7 串流
+    minimax = _get_minimax()
+    if minimax:
+        try:
+            async with minimax.messages.stream(
+                model=MINIMAX_MODEL, max_tokens=2048, temperature=0.7,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_input}],
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+            return
+        except Exception as e:
+            logger.warning(f"[L1 Stream] MiniMax failed: {e}")
+
+    # L2: Gemini 備援（非串流 fallback）
+    gemini = _get_gemini()
+    if gemini:
+        try:
+            import google.generativeai as genai
+            from google.generativeai.types import HarmCategory, HarmBlockThreshold
+            safety = {
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+            response = await gemini.generate_content_async(
+                user_input,
+                generation_config=genai.types.GenerationConfig(
+                    candidate_count=1, max_output_tokens=2048, temperature=0.7,
+                ),
+                safety_settings=safety
+            )
+            if response.candidates and response.candidates[0].content.parts:
+                yield response.text.strip()
+                logger.info("[L2 Stream] Gemini fallback OK (FREE)")
+                return
+        except Exception as e:
+            logger.warning(f"[L2 Stream] Gemini failed: {e}")
+
+    yield "我這邊剛才沒接收到完整回覆，你再說一次好嗎？"
